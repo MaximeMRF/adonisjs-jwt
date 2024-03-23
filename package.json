@@ -1,21 +1,21 @@
 {
-  "name": "jwt-auth",
+  "name": "@maximemrf/adonisjs-jwt",
   "description": "",
-  "version": "0.0.1",
+  "version": "0.0.12",
   "engines": {
     "node": ">=20.6.0"
   },
   "type": "module",
   "files": [
     "build/src",
-    "build/providers",
     "build/stubs",
     "build/index.d.ts",
     "build/index.js"
   ],
   "exports": {
     ".": "./build/index.js",
-    "./types": "./build/src/types.js"
+    "./types": "./build/src/types.js",
+    "./jwt_config": "./build/src/define_config.js"
   },
   "scripts": {
     "clean": "del-cli build",
