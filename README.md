@@ -39,6 +39,7 @@ const authConfig = defineConfig({
     }),
     // add the jwt guard
     jwt: jwtGuard({
+      // tokenExpiresIn can be a string or a number, it can be optional
       tokenExpiresIn: '1h',
       provider: sessionUserProvider({
         model: () => import('#models/user'),
@@ -48,7 +49,7 @@ const authConfig = defineConfig({
 })
 ```
 
-`tokenExpiresIn` is the time before the token expires it can be a string or a number.
+`tokenExpiresIn` is the time before the token expires it can be a string or a number, it can be optional.
 
 ```typescript
 // string
