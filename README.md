@@ -3,7 +3,7 @@
 
 ## Prerequisites
 
-You have to install the auth package from AdonisJS with the session guard.
+You have to install the auth package from AdonisJS with the session guard because the jwt package use some components from the session guard.
 
 ```bash
 node ace add @adonisjs/auth --guard=session
@@ -11,7 +11,7 @@ node ace add @adonisjs/auth --guard=session
 
 ## Setup
 
-This package is available in the npm registry.
+Install the package:
 
 ```bash
 npm i @maximemrf/adonisjs-jwt
@@ -48,11 +48,28 @@ const authConfig = defineConfig({
 })
 ```
 
+`tokenExpiresIn` is the time before the token expires it can be a string or a number.
+
+```typescript
+// string
+tokenExpiresIn: '1h'
+// number
+tokenExpiresIn: 60 * 60
+```
+
 ## Usage
 
 To make a protected route, you have to use the `auth` middleware with the `jwt` guard.
 
 ```typescript
+router.post('login', async ({ request, auth }) => {
+  const { email, password } = request.all()
+  const user = await User.verifyCredentials(email, password)
+
+  // to generate a token
+  return await auth.use('jwt').generate(user)
+})
+
 // if the jwt guard is the default guard
 router.get('/', async ({ auth }) => {
   return auth.getUserOrFail()
