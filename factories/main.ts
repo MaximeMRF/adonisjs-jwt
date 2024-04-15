@@ -1,5 +1,6 @@
 import { JwtUserProviderContract } from '../src/jwt.js'
 import { symbols } from '@adonisjs/auth'
+import jwt from 'jsonwebtoken'
 
 export type JwtAuthFakeUser = {
   id: number
@@ -22,6 +23,14 @@ export const users: JwtAuthFakeUser[] = [
 
 export class JwtFakeUserProvider implements JwtUserProviderContract<JwtAuthFakeUser> {
   declare [symbols.PROVIDER_REAL_USER]: JwtAuthFakeUser
+
+  async createToken(
+    user: JwtAuthFakeUser,
+    secret: string,
+    options?: { expiresIn?: string | number }
+  ) {
+    return jwt.sign({ userId: user.id }, secret, options)
+  }
 
   /**
    * Creates the adapter user for the guard

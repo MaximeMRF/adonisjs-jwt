@@ -55,6 +55,7 @@
     "luxon": "^3.4.4",
     "np": "^10.0.0",
     "prettier": "^3.2.5",
+    "timekeeper": "^2.3.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.2"
   },
