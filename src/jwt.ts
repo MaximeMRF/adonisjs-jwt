@@ -45,6 +45,7 @@ export interface JwtUserProviderContract<RealUser> {
 export type JwtGuardOptions = {
   secret: string
   expiresIn?: number | string
+  useCookies?: boolean
 }
 
 export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
@@ -102,6 +103,12 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
         : {}
     )
 
+    if (this.#options.useCookies) {
+      return this.#ctx.response.cookie('token', token, {
+        httpOnly: true,
+      })
+    }
+
     return {
       type: 'bearer',
       token: token,
@@ -124,24 +131,41 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     }
     this.authenticationAttempted = true
 
+    const cookieHeader = this.#ctx.request.request.headers.cookie
+    let token
+
     /**
-     * Ensure the auth header exists
+     * If cookies are enabled, then read the token from the cookies
      */
-    const authHeader = this.#ctx.request.header('authorization')
-    if (!authHeader) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
+    if (cookieHeader) {
+      token = this.#ctx.request.cookie('token')
+        ? this.#ctx.request.cookie('token')
+        : (this.#ctx.request.request.headers.cookie!.match(/token=(.*?)(;|$)/) || [])[1]
     }
 
     /**
-     * Split the header value and read the token from it
+     * If token is missing on cookies, then try to read it from the header authorization
      */
-    const [, token] = authHeader.split('Bearer ')
     if (!token) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
+      /**
+       * Ensure the auth header exists
+       */
+      const authHeader = this.#ctx.request.header('authorization')
+      if (!authHeader) {
+        throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+          guardDriverName: this.driverName,
+        })
+      }
+
+      /**
+       * Split the header value and read the token from it
+       */
+      ;[, token] = authHeader!.split('Bearer ')
+      if (!token) {
+        throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+          guardDriverName: this.driverName,
+        })
+      }
     }
 
     /**
@@ -210,10 +234,10 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
   async authenticateAsClient(
     user: UserProvider[typeof symbols.PROVIDER_REAL_USER]
   ): Promise<AuthClientResponse> {
-    const token = await this.generate(user)
+    const token: any = await this.generate(user)
     return {
       headers: {
-        authorization: `Bearer ${token.token}`,
+        authorization: `Bearer ${this.#options.useCookies ? token : token.token}`,
       },
     }
   }

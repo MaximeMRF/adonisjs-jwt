@@ -41,6 +41,8 @@ const authConfig = defineConfig({
     jwt: jwtGuard({
       // tokenExpiresIn can be a string or a number, it can be optional
       tokenExpiresIn: '1h',
+      // if you want to use cookies for the authentication instead of the bearer token (optional)
+      useCookies: true,
       provider: sessionUserProvider({
         model: () => import('#models/user'),
       }),
@@ -49,7 +51,7 @@ const authConfig = defineConfig({
 })
 ```
 
-`tokenExpiresIn` is the time before the token expires it can be a string or a number, it can be optional.
+`tokenExpiresIn` is the time before the token expires it can be a string or a number and it can be optional.
 
 ```typescript
 // string
@@ -57,6 +59,14 @@ tokenExpiresIn: '1h'
 // number
 tokenExpiresIn: 60 * 60
 ```
+
+You can also use cookies for the authentication instead of the bearer token by setting `useCookies` to `true`.
+
+```typescript
+useCookies: true
+```
+
+If you just want to use jwt with the bearer token no need to set `useCookies` to `false` you can just remove it.
 
 ## Usage
 
