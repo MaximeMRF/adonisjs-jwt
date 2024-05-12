@@ -23,7 +23,90 @@ test.group('Jwt guard | authenticate', () => {
     assert.deepEqual(guard.getUserOrFail(), authenticatedUser)
   })
 
-  test('throw error when authorization header is missing', async ({ assert }) => {
+  test('it should return a cookie when user is authenticated', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret', useCookies: true })
+    ctx.request.request.headers.cookie = 'token=' + jwt.sign({ userId: 1 }, 'thisisasecret')
+
+    const authenticatedUser = await guard.authenticate()
+
+    assert.isTrue(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+
+    assert.equal(guard.user, authenticatedUser)
+    assert.deepEqual(guard.getUserOrFail(), authenticatedUser)
+  })
+
+  test('throw error when cookie header is invalid', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    ctx.request.request.headers.cookie = 'foo bar'
+    const [result] = await Promise.allSettled([guard.authenticate()])
+
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error when cookie token is empty', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    ctx.request.request.headers.cookie = 'token='
+    const [result] = await Promise.allSettled([guard.authenticate()])
+
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error when cookie token has been expired', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const user = await userProvider.findById(1)
+    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret', {
+      expiresIn: '1h',
+    })
+
+    timeTravel(61 * 60)
+
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    ctx.request.request.headers.cookie = `token=${token}`
+    const [result] = await Promise.allSettled([guard.authenticate()])
+
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error when authorization header and cookie header are missing', async ({
+    assert,
+  }) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
