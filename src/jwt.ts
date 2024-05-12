@@ -138,7 +138,9 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
      * If cookies are enabled, then read the token from the cookies
      */
     if (cookieHeader) {
-      ;[, token] = cookieHeader!.split('=')
+      token = this.#ctx.request.cookie('token')
+        ? this.#ctx.request.cookie('token')
+        : (this.#ctx.request.request.headers.cookie!.match(/token=(.*?)(;|$)/) || [])[1]
     }
 
     /**
