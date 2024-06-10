@@ -5,7 +5,7 @@ import { Secret } from '@adonisjs/core/helpers'
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
-  tokenExpiresIn: number | string
+  tokenExpiresIn?: number | string
   useCookies?: boolean
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
