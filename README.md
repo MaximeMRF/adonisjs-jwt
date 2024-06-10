@@ -93,3 +93,7 @@ router.get('/', async ({ auth }) => {
 })
 .use(middleware.auth({ guards: ['jwt'] }))
 ```
+
+## Security
+
+We use natively the AdonisJS application key to sign the token, so you don't have to worry about it and [avoid this](https://trufflesecurity.com/blog/stop-recommending-jwts).
