@@ -42,10 +42,11 @@ export interface JwtUserProviderContract<RealUser> {
   findById(identifier: string | number | BigInt): Promise<JwtGuardUser<RealUser> | null>
 }
 
-export type JwtGuardOptions = {
+export type JwtGuardOptions<RealUser extends any = unknown> = {
   secret: string
   expiresIn?: number | string
   useCookies?: boolean
+  content?: (user: JwtGuardUser<RealUser>) => Record<string, any>
 }
 
 export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
@@ -53,12 +54,17 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
 {
   #ctx: HttpContext
   #userProvider: UserProvider
-  #options: JwtGuardOptions
+  #options: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
 
-  constructor(ctx: HttpContext, userProvider: UserProvider, option: JwtGuardOptions) {
+  constructor(
+    ctx: HttpContext,
+    userProvider: UserProvider,
+    option: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
+  ) {
     this.#ctx = ctx
     this.#userProvider = userProvider
     this.#options = option
+    if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
   }
   /**
    * A list of events and their types emitted by
@@ -94,7 +100,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
   async generate(user: UserProvider[typeof symbols.PROVIDER_REAL_USER]) {
     const providerUser = await this.#userProvider.createUserForGuard(user)
     const token = jwt.sign(
-      { userId: providerUser.getId() },
+      this.#options.content!(providerUser),
       this.#options.secret,
       this.#options.expiresIn
         ? {

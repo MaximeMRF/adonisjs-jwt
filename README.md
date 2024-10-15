@@ -26,6 +26,7 @@ import { defineConfig } from '@adonisjs/auth'
 import { InferAuthEvents, Authenticators } from '@adonisjs/auth/types'
 import { sessionGuard, sessionUserProvider } from '@adonisjs/auth/session'
 import { jwtGuard } from '@maximemrf/adonisjs-jwt/jwt_config'
+import { JwtGuardUser } from '@maximemrf/adonisjs-jwt/types'
 
 const authConfig = defineConfig({
   // define the default authenticator to jwt
@@ -45,6 +46,11 @@ const authConfig = defineConfig({
       useCookies: true,
       provider: sessionUserProvider({
         model: () => import('#models/user'),
+      }),
+      // content is a function that takes the user and returns the content of the token, it can be optional, by default it returns only the user id
+      content: (user: JwtGuardUser<User>) => ({
+        id: user.getId(),
+        email: user.getOriginal().email,
       }),
     }),
   },

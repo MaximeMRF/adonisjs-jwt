@@ -1,12 +1,13 @@
 import { GuardConfigProvider } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
-import { JwtGuard, JwtUserProviderContract } from './jwt.js'
+import { JwtGuard, JwtGuardUser, JwtUserProviderContract } from './jwt.js'
 import { Secret } from '@adonisjs/core/helpers'
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
   tokenExpiresIn?: number | string
   useCookies?: boolean
+  content: <T>(user: JwtGuardUser<T>) => Record<string, any>
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {
@@ -15,6 +16,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
         secret: appKey,
         expiresIn: config.tokenExpiresIn,
         useCookies: config.useCookies,
+        content: config.content,
       }
       return (ctx) => new JwtGuard(ctx, config.provider, options)
     },
