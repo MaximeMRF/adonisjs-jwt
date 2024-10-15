@@ -1,7 +1,7 @@
 {
   "name": "@maximemrf/adonisjs-jwt",
-  "description": "",
-  "version": "0.1.0",
+  "description": "Adonisjs v6 package for authentication with jwt token",
+  "version": "0.2.0",
   "engines": {
     "node": ">=20.6.0"
   },
@@ -33,9 +33,6 @@
     "version": "npm run build",
     "prepublishOnly": "npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "MIT",
   "devDependencies": {
     "@adonisjs/assembler": "^7.2.3",
     "@adonisjs/auth": "^9.1.1",
@@ -62,6 +59,14 @@
   "peerDependencies": {
     "@adonisjs/core": "^6.2.0"
   },
+  "author": "MaximeMRF",
+  "license": "MIT",
+  "keywords": [
+    "adonisjs",
+    "adonis",
+    "jwt",
+    "authentication"
+  ],
   "publishConfig": {
     "access": "public",
     "tag": "latest"
