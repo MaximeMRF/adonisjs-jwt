@@ -27,6 +27,7 @@ import { InferAuthEvents, Authenticators } from '@adonisjs/auth/types'
 import { sessionGuard, sessionUserProvider } from '@adonisjs/auth/session'
 import { jwtGuard } from '@maximemrf/adonisjs-jwt/jwt_config'
 import { JwtGuardUser } from '@maximemrf/adonisjs-jwt/types'
+import User from '#models/user'
 
 const authConfig = defineConfig({
   // define the default authenticator to jwt
