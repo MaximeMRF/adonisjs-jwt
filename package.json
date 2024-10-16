@@ -56,6 +56,10 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.4.2"
   },
+  "dependencies": {
+    "@types/jsonwebtoken": "^9.0.6",
+    "jsonwebtoken": "^9.0.2"
+  },
   "peerDependencies": {
     "@adonisjs/core": "^6.2.0"
   },
@@ -67,6 +71,10 @@
     "jwt",
     "authentication"
   ],
+  "eslintConfig": {
+    "extends": "@adonisjs/eslint-config/package"
+  },
+  "prettier": "@adonisjs/prettier-config",
   "publishConfig": {
     "access": "public",
     "tag": "latest"
@@ -85,13 +93,5 @@
     "exclude": [
       "tests/**"
     ]
-  },
-  "eslintConfig": {
-    "extends": "@adonisjs/eslint-config/package"
-  },
-  "prettier": "@adonisjs/prettier-config",
-  "dependencies": {
-    "@types/jsonwebtoken": "^9.0.6",
-    "jsonwebtoken": "^9.0.2"
   }
 }

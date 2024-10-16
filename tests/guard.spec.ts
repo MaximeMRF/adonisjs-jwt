@@ -1,5 +1,6 @@
 import { test } from '@japa/runner'
-import { JwtGuard, JwtGuardUser } from '../src/jwt.js'
+import { JwtGuard } from '../src/jwt.js'
+import { JwtGuardUser } from '../src/types.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { errors } from '@adonisjs/auth'
 import { JwtAuthFakeUser, JwtFakeUserProvider } from '../factories/main.js'
