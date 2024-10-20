@@ -8,7 +8,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   provider: UserProvider
   tokenExpiresIn?: number | string
   useCookies?: boolean
-  content: <T>(user: JwtGuardUser<T>) => Record<string, any>
+  content: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {

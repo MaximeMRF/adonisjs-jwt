@@ -39,6 +39,10 @@ export interface JwtUserProviderContract<RealUser> {
   findById(identifier: string | number | BigInt): Promise<JwtGuardUser<RealUser> | null>
 }
 
+export type BaseJwtContent = {
+  userId: string | number | BigInt
+}
+
 export type JwtGuardOptions<RealUser extends any = unknown> = {
   secret: string
   expiresIn?: number | string
