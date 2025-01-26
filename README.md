@@ -53,10 +53,12 @@ const authConfig = defineConfig({
         model: () => import('#models/user'),
       }),
       // content is a function that takes the user and returns the content of the token, it can be optional, by default it returns only the user id
-      content: (user: JwtGuardUser<User>): JwtContent => ({
-        userId: user.getId(),
-        email: user.getOriginal().email,
-      }),
+      content: <T>(user: JwtGuardUser<T>): JwtContent => {
+        return {
+          userId: user.getId(),
+          email: (user.getOriginal() as User).email,
+        }
+      },
     }),
   },
 })
