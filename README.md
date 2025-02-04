@@ -1,4 +1,14 @@
-# AdonisJS Jwt Auth
+<p align="center">
+  <img src="https://maximemax.sirv.com/npm_package_maxime_jwt.png" alt="@maximemrf/adonisjs-jwt">
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@maximemrf/adonisjs-jwt"><img src="https://img.shields.io/npm/dm/@maximemrf/adonisjs-jwt.svg?style=flat-square" alt="Download"></a>
+  <a href="https://www.npmjs.com/package/@maximemrf/adonisjs-jwt"><img src="https://img.shields.io/npm/v/@maximemrf/adonisjs-jwt.svg?style=flat-square" alt="Version"></a>
+  <a href="https://www.npmjs.com/package/@maximemrf/adonisjs-jwt"><img src="https://img.shields.io/npm/last-update/@maximemrf/adonisjs-jwt.svg?style=flat-square" alt="NPM Last Update"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/npm/l/@maximemrf/adonisjs-jwt.svg?style=flat-square" alt="License"></a>
+</p>
+
 > AdonisJS package to authenticate users using JWT tokens.
 
 ## Prerequisites
