@@ -47,7 +47,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
   /**
    * Reference to the currently authenticated user
    */
-  user?: UserProvider[typeof symbols.PROVIDER_REAL_USER]
+  user?: UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string }
 
   /**
    * Generate a JWT token for a given user.
@@ -82,7 +82,9 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
    * the user instance if there is a valid JWT token
    * or throw an exception
    */
-  async authenticate(): Promise<UserProvider[typeof symbols.PROVIDER_REAL_USER]> {
+  async authenticate(): Promise<
+    UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string }
+  > {
     /**
      * Avoid re-authentication when it has been done already
      * for the given request
@@ -159,7 +161,10 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     }
 
     this.isAuthenticated = true
-    this.user = providerUser.getOriginal()
+    this.user = providerUser.getOriginal() as UserProvider[typeof symbols.PROVIDER_REAL_USER] & {
+      currentToken: string
+    }
+    this.user!.currentToken = token
     return this.getUserOrFail()
   }
 
@@ -178,7 +183,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
   /**
    * Returns the authenticated user or throws an error
    */
-  getUserOrFail(): UserProvider[typeof symbols.PROVIDER_REAL_USER] {
+  getUserOrFail(): UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string } {
     if (!this.user) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,

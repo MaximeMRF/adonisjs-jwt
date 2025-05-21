@@ -1,4 +1,5 @@
 import { symbols } from '@adonisjs/auth'
+import type { StringValue } from 'ms'
 
 /**
  * The bridge between the User provider and the
@@ -25,7 +26,7 @@ export interface JwtUserProviderContract<RealUser> {
    * A property the guard implementation can use to infer
    * the data type of the actual user (aka RealUser)
    */
-  [symbols.PROVIDER_REAL_USER]: RealUser
+  [symbols.PROVIDER_REAL_USER]?: RealUser
 
   /**
    * Create a user object that acts as an adapter between
@@ -45,7 +46,7 @@ export type BaseJwtContent = {
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
   secret: string
-  expiresIn?: number | string
+  expiresIn?: number | StringValue
   useCookies?: boolean
   content?: (user: JwtGuardUser<RealUser>) => Record<string, any>
 }
