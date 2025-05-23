@@ -29,8 +29,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         node-version:
-          - 20.10.0
-          - 21.x
+          - 22.x
+          - 23.x
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js ${{ matrix.node-version }}
@@ -46,8 +46,8 @@ jobs:
     strategy:
       matrix:
         node-version:
-          - 20.10.0
-          - 21.x
+          - 22.x
+          - 23.x
     steps:
       - uses: actions/checkout@v2
       - name: Use Node.js ${{ matrix.node-version }}
