@@ -285,6 +285,7 @@ test.group('Jwt guard | check', () => {
       id: 1,
       email: 'maxou@max.com',
       password: 'secret',
+      currentToken: token,
     })
     assert.isTrue(guard.isAuthenticated)
     assert.isTrue(guard.authenticationAttempted)
