@@ -7,6 +7,7 @@ import type { StringValue } from 'ms'
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
+  tokenName?: string
   tokenExpiresIn?: number | StringValue
   useCookies?: boolean
   content: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
@@ -16,6 +17,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
       const appKey = (app.config.get('app.appKey') as Secret<string>).release()
       const options = {
         secret: appKey,
+        tokenName: config.tokenName,
         expiresIn: config.tokenExpiresIn,
         useCookies: config.useCookies,
         content: config.content,

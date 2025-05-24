@@ -40,6 +40,28 @@ test.group('Jwt guard | authenticate', () => {
     assert.deepEqual(guard.getUserOrFail(), authenticatedUser)
   })
 
+  test('it should return a cookie with custom name token when user is authenticated', async ({
+    assert,
+  }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+      useCookies: true,
+      tokenName: 'custom',
+    })
+    ctx.request.request.headers.cookie = 'custom=' + jwt.sign({ userId: 1 }, 'thisisasecret')
+
+    const authenticatedUser = await guard.authenticate()
+
+    assert.isTrue(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+
+    assert.equal(guard.user, authenticatedUser)
+    assert.deepEqual(guard.getUserOrFail(), authenticatedUser)
+  })
+
   test('it should return the content function provided when generating jwt', async ({ assert }) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()

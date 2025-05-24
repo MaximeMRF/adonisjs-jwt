@@ -10,6 +10,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
   #ctx: HttpContext
   #userProvider: UserProvider
   #options: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
+  #tokenName: string
 
   constructor(
     ctx: HttpContext,
@@ -20,6 +21,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     this.#userProvider = userProvider
     this.#options = option
     if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
+    this.#tokenName = this.#options.tokenName ?? 'token'
   }
   /**
    * A list of events and their types emitted by
@@ -65,7 +67,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     )
 
     if (this.#options.useCookies) {
-      return this.#ctx.response.cookie('token', token, {
+      return this.#ctx.response.cookie(`${this.#tokenName}`, token, {
         httpOnly: true,
       })
     }
@@ -101,9 +103,10 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
      * If cookies are enabled, then read the token from the cookies
      */
     if (cookieHeader) {
+      const regex = new RegExp(`${this.#tokenName}=([^;]*)`)
       token =
-        this.#ctx.request.cookie('token') ??
-        (this.#ctx.request.request.headers.cookie!.match(/token=(.*?)(;|$)/) || [])[1]
+        this.#ctx.request.cookie(`${this.#tokenName}`) ??
+        (this.#ctx.request.request.headers.cookie!.match(regex) || [])[1]
     }
 
     /**
