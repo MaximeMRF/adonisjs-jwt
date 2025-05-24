@@ -55,8 +55,8 @@ const authConfig = defineConfig({
     }),
     // add the jwt guard
     jwt: jwtGuard({
-      // tokenName a string, it can be optional
-      tokenName: '1h',
+      // tokenName is the name of the token passed as cookie, it can be optional, by default it is 'token'
+      tokenName: 'custom-name',
       // tokenExpiresIn can be a string or a number, it can be optional
       tokenExpiresIn: '1h',
       // if you want to use cookies for the authentication instead of the bearer token (optional)
@@ -76,7 +76,7 @@ const authConfig = defineConfig({
 })
 ```
 
-`tokenName` is the custom token name it a string and it can be optional.
+`tokenName` is the name of the token passed as a cookie, it can be optional, by default it is `token`.
 
 ```typescript
 tokenName: 'custom-name'
