@@ -38,6 +38,7 @@ import { sessionGuard, sessionUserProvider } from '@adonisjs/auth/session'
 import { jwtGuard } from '@maximemrf/adonisjs-jwt/jwt_config'
 import { JwtGuardUser, BaseJwtContent } from '@maximemrf/adonisjs-jwt/types'
 import User from '#models/user'
+import env from '#start/env'
 
 interface JwtContent extends BaseJwtContent {
   email: string
@@ -61,6 +62,10 @@ const authConfig = defineConfig({
       tokenExpiresIn: '1h',
       // if you want to use cookies for the authentication instead of the bearer token (optional)
       useCookies: true,
+      // secret is the secret used to sign the token, it can be optional, by default it uses the application key
+      // you can use a env variable like JWT_SECRET or set it directly with a string
+      // if you don't have specific needs, please discard this option
+      secret: env.get('JWT_SECRET'),
       provider: sessionUserProvider({
         model: () => import('#models/user'),
       }),
@@ -99,7 +104,7 @@ useCookies: true
 
 If you just want to use jwt with the bearer token no need to set `useCookies` to `false` you can just remove it.
 
-## Usage
+## Authentication
 
 To make a protected route, you have to use the `auth` middleware with the `jwt` guard.
 

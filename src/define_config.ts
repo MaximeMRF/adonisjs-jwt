@@ -10,13 +10,14 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   tokenName?: string
   tokenExpiresIn?: number | StringValue
   useCookies?: boolean
+  secret?: string
   content: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {
       const appKey = (app.config.get('app.appKey') as Secret<string>).release()
       const options = {
-        secret: appKey,
+        secret: config.secret ?? appKey,
         tokenName: config.tokenName,
         expiresIn: config.tokenExpiresIn,
         useCookies: config.useCookies,

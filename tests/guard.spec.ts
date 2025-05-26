@@ -62,6 +62,27 @@ test.group('Jwt guard | authenticate', () => {
     assert.deepEqual(guard.getUserOrFail(), authenticatedUser)
   })
 
+  test('it should return a token when the custom secret key is used for signing', async ({
+    assert,
+  }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const mySecret = 'customsecret'
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: mySecret,
+    })
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 1 }, mySecret)}`
+
+    const authenticatedUser = await guard.authenticate()
+
+    assert.isTrue(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+
+    assert.equal(guard.user, authenticatedUser)
+    assert.deepEqual(guard.getUserOrFail(), authenticatedUser)
+  })
+
   test('it should return the content function provided when generating jwt', async ({ assert }) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
