@@ -99,7 +99,6 @@ test.group('Jwt guard | authenticate', () => {
       secret: 'thisisasecret',
       expiresIn: '1h',
       content: jwtContentFn,
-      useCookies: false,
     })
     const user = await userProvider.findById(1)
 
@@ -116,6 +115,64 @@ test.group('Jwt guard | authenticate', () => {
 
     assert.equal(decoded.userId, content.userId)
     assert.equal(decoded.otherProperty, content.otherProperty)
+  })
+
+  test('throw error when the userId is not found in the payload', async ({ assert }) => {
+    const userProvider = new JwtFakeUserProvider()
+    const ctx = new HttpContextFactory().create()
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const token = jwt.sign({ foo: 'bar' }, 'thisisasecret')
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    const [result] = await Promise.allSettled([guard.authenticate()])
+
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error when the payload is not an object', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign('foo', 'thisisasecret')}`
+    const [result] = await Promise.allSettled([guard.authenticate()])
+
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error when the payload contains a userId that does not exist', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 999 }, 'thisisasecret')}`
+    const [result] = await Promise.allSettled([guard.authenticate()])
+
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
   })
 
   test('throw error when cookie header is invalid', async ({ assert }) => {
