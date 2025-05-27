@@ -23,7 +23,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "quick:test": "node --import=./tsnode.esm.js --enable-source-maps bin/test.ts",
+    "quick:test": "node --import=ts-node-maintained/register/esm --enable-source-maps --experimental-import-meta-resolve bin/test.ts --force-exit",
     "pretest": "npm run lint",
     "test": "c8 npm run quick:test",
     "prebuild": "npm run lint && npm run clean",
@@ -53,7 +53,7 @@
     "np": "^10.0.0",
     "prettier": "^3.5.3",
     "timekeeper": "^2.3.1",
-    "ts-node": "^10.9.2",
+    "ts-node-maintained": "^10.9.5",
     "typescript": "~5.8"
   },
   "dependencies": {
