@@ -6,8 +6,72 @@ import { errors } from '@adonisjs/auth'
 import { JwtAuthFakeUser, JwtFakeUserProvider } from '../factories/main.js'
 import jwt from 'jsonwebtoken'
 import { timeTravel } from '../tests/helpers.js'
+import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
+import { createDatabase, createTables } from '../tests/helpers.js'
+import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 
 test.group('Jwt guard | authenticate', () => {
+  test('it should return a jwt token when user is authenticated with refresh token', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const db = await createDatabase()
+    await createTables(db)
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+      refreshTokenUserProvider: tokensUserProvider({
+        tokens: 'refreshTokens',
+        async model() {
+          return {
+            default: User,
+          }
+        },
+      }),
+    })
+
+    class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+
+      @column()
+      declare username: string
+
+      @column()
+      declare email: string
+
+      @column()
+      declare password: string
+
+      static refreshTokens = DbAccessTokensProvider.forModel(User, {
+        prefix: 'rt_',
+        table: 'jwt_refresh_tokens',
+        type: 'auth_token',
+        tokenSecretLength: 40,
+      })
+    }
+
+    const user = await User.create({
+      email: 'max@example.com',
+      username: 'max',
+      password: 'secret',
+    })
+
+    const refreshToken = await User.refreshTokens.create(user)
+
+    ctx.request.request.headers.authorization = `Bearer ${refreshToken.value?.release()}`
+
+    const userAuthenticated = await guard.authenticateWithRefreshToken()
+
+    assert.isTrue(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+    assert.equal(guard.user, userAuthenticated)
+    assert.deepEqual(guard.getUserOrFail(), userAuthenticated)
+    assert.exists(userAuthenticated.currentToken)
+    assert.exists(refreshToken.value?.release())
+  })
+
   test('it should return a token when user is authenticated', async ({ assert }) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()

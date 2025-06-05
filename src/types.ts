@@ -46,6 +46,7 @@ export type BaseJwtContent = {
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
   secret: string
+  refreshTokenUserProvider?: any
   tokenName?: string
   expiresIn?: number | StringValue
   useCookies?: boolean
