@@ -178,15 +178,6 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string }
   > {
     /**
-     * Ensure the refresh token user provider is defined
-     */
-    if (!this.#refreshTokenUserProvider) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
-    }
-
-    /**
      * Avoid re-authentication when it has been done already
      * for the given request
      */
@@ -195,6 +186,14 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     }
     this.authenticationAttempted = true
 
+    /**
+     * Ensure the refresh token user provider is defined
+     */
+    if (!this.#refreshTokenUserProvider) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
     /**
      * Ensure the auth header exists
      */
@@ -218,9 +217,10 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     const accessToken = await this.#refreshTokenUserProvider.verifyToken(new Secret(refreshToken))
 
     /**
-     * Fetch the user by user ID and save a reference to it
+     * Fetch the user by user ID
      */
     const providerUser = await this.#userProvider.findById(accessToken.tokenableId)
+    console.log('providerUser', providerUser?.getOriginal())
     if (!providerUser) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,

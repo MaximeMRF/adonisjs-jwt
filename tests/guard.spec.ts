@@ -12,7 +12,9 @@ import { createDatabase, createTables } from '../tests/helpers.js'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 
 test.group('Jwt guard | authenticate', () => {
-  test('it should return a jwt token when user is authenticated with refresh token', async ({ assert }) => {
+  test('it should return a jwt token when user is authenticated with refresh token', async ({
+    assert,
+  }) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
@@ -47,7 +49,7 @@ test.group('Jwt guard | authenticate', () => {
       static refreshTokens = DbAccessTokensProvider.forModel(User, {
         prefix: 'rt_',
         table: 'jwt_refresh_tokens',
-        type: 'auth_token',
+        type: 'jwt_refresh_token',
         tokenSecretLength: 40,
       })
     }
@@ -70,6 +72,312 @@ test.group('Jwt guard | authenticate', () => {
     assert.deepEqual(guard.getUserOrFail(), userAuthenticated)
     assert.exists(userAuthenticated.currentToken)
     assert.exists(refreshToken.value?.release())
+  })
+
+  test('throw error when refresh token user provider is not defined', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+    })
+
+    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error when refresh token authorization header is missing', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const db = await createDatabase()
+    await createTables(db)
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+      refreshTokenUserProvider: tokensUserProvider({
+        tokens: 'refreshTokens',
+        async model() {
+          return {
+            default: User,
+          }
+        },
+      }),
+    })
+
+    class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+
+      @column()
+      declare username: string
+
+      @column()
+      declare email: string
+
+      @column()
+      declare password: string
+
+      static refreshTokens = DbAccessTokensProvider.forModel(User, {
+        prefix: 'rt_',
+        table: 'jwt_refresh_tokens',
+        type: 'jwt_refresh_token',
+        tokenSecretLength: 40,
+      })
+    }
+
+    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error when refresh token authorization header is invalid', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const db = await createDatabase()
+    await createTables(db)
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+      refreshTokenUserProvider: tokensUserProvider({
+        tokens: 'refreshTokens',
+        async model() {
+          return {
+            default: User,
+          }
+        },
+      }),
+    })
+
+    class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+
+      @column()
+      declare username: string
+
+      @column()
+      declare email: string
+
+      @column()
+      declare password: string
+
+      static refreshTokens = DbAccessTokensProvider.forModel(User, {
+        prefix: 'rt_',
+        table: 'jwt_refresh_tokens',
+        type: 'jwt_refresh_token',
+        tokenSecretLength: 40,
+      })
+    }
+
+    ctx.request.request.headers.authorization = `foo bar`
+    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error if the user authentication attempt has been made already', async ({
+    assert,
+  }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const db = await createDatabase()
+    await createTables(db)
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+      refreshTokenUserProvider: tokensUserProvider({
+        tokens: 'refreshTokens',
+        async model() {
+          return {
+            default: User,
+          }
+        },
+      }),
+    })
+
+    class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+
+      @column()
+      declare username: string
+
+      @column()
+      declare email: string
+
+      @column()
+      declare password: string
+
+      static refreshTokens = DbAccessTokensProvider.forModel(User, {
+        prefix: 'rt_',
+        table: 'jwt_refresh_tokens',
+        type: 'jwt_refresh_token',
+        tokenSecretLength: 40,
+      })
+    }
+
+    const user = await User.create({
+      email: 'maxime@example.com',
+      username: 'maxime',
+      password: 'password',
+    })
+
+    const refreshToken = await User.refreshTokens.create(user)
+
+    await assert.rejects(() => guard.authenticate(), 'Unauthorized access')
+    ctx.request.request.headers.authorization = `Bearer ${refreshToken.value?.release()}`
+    await assert.rejects(() => guard.authenticate(), 'Unauthorized access')
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('it should return the user when user is already authenticated with refresh token', async ({
+    assert,
+  }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const db = await createDatabase()
+    await createTables(db)
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+      refreshTokenUserProvider: tokensUserProvider({
+        tokens: 'refreshTokens',
+        async model() {
+          return {
+            default: User,
+          }
+        },
+      }),
+    })
+
+    class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+
+      @column()
+      declare username: string
+
+      @column()
+      declare email: string
+
+      @column()
+      declare password: string
+
+      static refreshTokens = DbAccessTokensProvider.forModel(User, {
+        prefix: 'rt_',
+        table: 'jwt_refresh_tokens',
+        type: 'jwt_refresh_token',
+        tokenSecretLength: 40,
+      })
+    }
+
+    const user = await User.create({
+      email: 'maxime@example.com',
+      username: 'maxime',
+      password: 'password',
+    })
+    const refreshToken = await User.refreshTokens.create(user)
+    ctx.request.request.headers.authorization = `Bearer ${refreshToken.value?.release()}`
+    await guard.authenticateWithRefreshToken()
+    const authenticatedUser = await guard.authenticateWithRefreshToken()
+    assert.isTrue(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+    assert.equal(guard.user, authenticatedUser)
+    assert.deepEqual(guard.getUserOrFail(), authenticatedUser)
+    assert.exists(authenticatedUser.currentToken)
+    assert.exists(refreshToken.value?.release())
+  })
+
+  test('throw error when the refresh token used belongs to a unknown user', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const db = await createDatabase()
+    await createTables(db)
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+      refreshTokenUserProvider: tokensUserProvider({
+        tokens: 'refreshTokens',
+        async model() {
+          return {
+            default: User,
+          }
+        },
+      }),
+    })
+
+    class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+
+      @column()
+      declare username: string
+
+      @column()
+      declare email: string
+
+      @column()
+      declare password: string
+
+      static refreshTokens = DbAccessTokensProvider.forModel(User, {
+        prefix: 'rt_',
+        table: 'jwt_refresh_tokens',
+        type: 'jwt_refresh_token',
+        tokenSecretLength: 40,
+      })
+    }
+
+    await User.createMany([
+      {
+        email: 'john@example.com',
+        username: 'john',
+        password: 'password',
+      },
+      {
+        email: 'jane@example.com',
+        username: 'jane',
+        password: 'password',
+      },
+    ])
+
+    const user = await User.create({
+      email: 'maxime@example.com',
+      username: 'maxime',
+      password: 'password',
+    })
+    const refreshToken = await User.refreshTokens.create(user)
+    ctx.request.request.headers.authorization = `Bearer ${refreshToken.value?.release()}`
+    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
   })
 
   test('it should return a token when user is authenticated', async ({ assert }) => {
@@ -414,9 +722,7 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
     const user = await userProvider.findById(1)
-    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret', {
-      expiresIn: '1h',
-    })
+    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret')
 
     const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
     await assert.rejects(() => guard.authenticate(), 'Unauthorized access')

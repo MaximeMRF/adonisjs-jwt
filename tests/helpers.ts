@@ -131,7 +131,6 @@ export async function createTables(db: Database) {
   test.cleanup(async () => {
     await db.connection().schema.dropTable('users')
     await db.connection().schema.dropTable('jwt_refresh_tokens')
-    await db.connection().schema.dropTable('remember_me_tokens')
   })
 
   await db.connection().schema.createTable('jwt_refresh_tokens', (table) => {
@@ -152,14 +151,5 @@ export async function createTables(db: Database) {
     table.string('username').unique().notNullable()
     table.string('email').unique().notNullable()
     table.string('password').nullable()
-  })
-
-  await db.connection().schema.createTable('remember_me_tokens', (table) => {
-    table.increments()
-    table.integer('tokenable_id').notNullable().unsigned()
-    table.string('hash', 80).notNullable()
-    table.timestamp('created_at', { precision: 6, useTz: true }).notNullable()
-    table.timestamp('updated_at', { precision: 6, useTz: true }).notNullable()
-    table.timestamp('expires_at', { precision: 6, useTz: true }).notNullable()
   })
 }
