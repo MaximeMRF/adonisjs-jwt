@@ -42,6 +42,7 @@
     "@adonisjs/prettier-config": "^1.4.4",
     "@adonisjs/tsconfig": "^1.4.0",
     "@japa/assert": "^4.0.1",
+    "@japa/file-system": "^2.3.2",
     "@japa/runner": "^4.2.0",
     "@swc/core": "1.11.24",
     "@types/node": "^22.15.18",
@@ -52,6 +53,7 @@
     "luxon": "^3.4.4",
     "np": "^10.0.0",
     "prettier": "^3.5.3",
+    "sqlite3": "^5.1.7",
     "timekeeper": "^2.3.1",
     "ts-node-maintained": "^10.9.5",
     "typescript": "~5.8"
