@@ -72,39 +72,6 @@ export async function createDatabase() {
             filename: join(test.context.fs.basePath, 'db.sqlite3'),
           },
         },
-        pg: {
-          client: 'pg',
-          connection: {
-            host: process.env.PG_HOST as string,
-            port: Number(process.env.PG_PORT),
-            database: process.env.PG_DATABASE as string,
-            user: process.env.PG_USER as string,
-            password: process.env.PG_PASSWORD as string,
-          },
-        },
-        mssql: {
-          client: 'mssql',
-          connection: {
-            server: process.env.MSSQL_HOST as string,
-            port: Number(process.env.MSSQL_PORT! as string),
-            user: process.env.MSSQL_USER as string,
-            password: process.env.MSSQL_PASSWORD as string,
-            database: 'master',
-            options: {
-              enableArithAbort: true,
-            },
-          },
-        },
-        mysql: {
-          client: 'mysql2',
-          connection: {
-            host: process.env.MYSQL_HOST as string,
-            port: Number(process.env.MYSQL_PORT),
-            database: process.env.MYSQL_DATABASE as string,
-            user: process.env.MYSQL_USER as string,
-            password: process.env.MYSQL_PASSWORD as string,
-          },
-        },
       },
     },
     logger,
