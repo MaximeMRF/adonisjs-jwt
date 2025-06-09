@@ -4,13 +4,16 @@ import type { HttpContext } from '@adonisjs/core/http'
 import jwt from 'jsonwebtoken'
 import { JwtUserProviderContract, JwtGuardOptions } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
+import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 
 export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
   implements GuardContract<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
 {
   #ctx: HttpContext
   #userProvider: UserProvider
-  #refreshTokenUserProvider?: any
+  #refreshTokenUserProvider?: AccessTokensUserProviderContract<
+    UserProvider[typeof symbols.PROVIDER_REAL_USER]
+  >
   #options: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
   #tokenName: string
 
@@ -216,29 +219,46 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
 
     const accessToken = await this.#refreshTokenUserProvider.verifyToken(new Secret(refreshToken))
 
-    /**
-     * Fetch the user by user ID
-     */
-    const providerUser = await this.#userProvider.findById(accessToken.tokenableId)
-    console.log('providerUser', providerUser?.getOriginal())
-    if (!providerUser) {
+    if (!accessToken) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })
     }
 
     /**
-     * Generate a new JWT token for the user
+     * Fetch the user by user ID
      */
-    const { token }: any = await this.generate(providerUser.getOriginal())
+    const providerUser = await this.#refreshTokenUserProvider.findById(accessToken.tokenableId)
+    if (!providerUser) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
     this.isAuthenticated = true
     this.user = providerUser.getOriginal() as UserProvider[typeof symbols.PROVIDER_REAL_USER] & {
       currentToken: string
     }
 
-    if (!this.#options.useCookies) {
-      this.user!.currentToken = token
+    /**
+     * Delete the refresh token from the database
+     */
+    const isDeleted = await this.#refreshTokenUserProvider.invalidateToken(new Secret(refreshToken))
+    if (!isDeleted) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
     }
+
+    const newRefreshToken = await this.#refreshTokenUserProvider.createToken(this.user)
+
+    if (!newRefreshToken.value) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    this.user.currentToken = newRefreshToken.value?.release()
 
     return this.getUserOrFail()
   }

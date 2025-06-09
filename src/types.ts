@@ -1,5 +1,6 @@
 import { symbols } from '@adonisjs/auth'
 import type { StringValue } from 'ms'
+import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 
 /**
  * The bridge between the User provider and the
@@ -46,7 +47,7 @@ export type BaseJwtContent = {
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
   secret: string
-  refreshTokenUserProvider?: any
+  refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string
   expiresIn?: number | StringValue
   useCookies?: boolean

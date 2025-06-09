@@ -349,26 +349,64 @@ test.group('Jwt guard | authenticate', () => {
       })
     }
 
-    await User.createMany([
-      {
-        email: 'john@example.com',
-        username: 'john',
-        password: 'password',
-      },
-      {
-        email: 'jane@example.com',
-        username: 'jane',
-        password: 'password',
-      },
-    ])
-
     const user = await User.create({
       email: 'maxime@example.com',
       username: 'maxime',
       password: 'password',
     })
     const refreshToken = await User.refreshTokens.create(user)
+    await user.delete()
     ctx.request.request.headers.authorization = `Bearer ${refreshToken.value?.release()}`
+    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    assert.equal(result!.status, 'rejected')
+    if (result!.status === 'rejected') {
+      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+    assert.isUndefined(guard.user)
+    assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')
+    assert.isFalse(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+  })
+
+  test('throw error when the refresh token is invalid', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const db = await createDatabase()
+    await createTables(db)
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'thisisasecret',
+      refreshTokenUserProvider: tokensUserProvider({
+        tokens: 'refreshTokens',
+        async model() {
+          return {
+            default: User,
+          }
+        },
+      }),
+    })
+
+    class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+
+      @column()
+      declare username: string
+
+      @column()
+      declare email: string
+
+      @column()
+      declare password: string
+
+      static refreshTokens = DbAccessTokensProvider.forModel(User, {
+        prefix: 'rt_',
+        table: 'jwt_refresh_tokens',
+        type: 'jwt_refresh_token',
+        tokenSecretLength: 40,
+      })
+    }
+
+    ctx.request.request.headers.authorization = `Bearer abcd`
     const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
     assert.equal(result!.status, 'rejected')
     if (result!.status === 'rejected') {
