@@ -13,10 +13,10 @@
 
 ## Prerequisites
 
-You have to install the auth package from AdonisJS with the session guard because the jwt package use some components from the session guard.
+You have to install the auth package from AdonisJS
 
 ```bash
-node ace add @adonisjs/auth --guard=session
+node ace add @adonisjs/auth
 ```
 
 ## Setup
@@ -35,6 +35,7 @@ Go to `config/auth.ts` and add the following configuration:
 import { defineConfig } from '@adonisjs/auth'
 import { InferAuthEvents, Authenticators } from '@adonisjs/auth/types'
 import { sessionGuard, sessionUserProvider } from '@adonisjs/auth/session'
+import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 import { jwtGuard } from '@maximemrf/adonisjs-jwt/jwt_config'
 import { JwtGuardUser, BaseJwtContent } from '@maximemrf/adonisjs-jwt/types'
 import User from '#models/user'
@@ -69,6 +70,11 @@ const authConfig = defineConfig({
       provider: sessionUserProvider({
         model: () => import('#models/user'),
       }),
+      // if you want to use refresh tokens, you have to set the refreshTokenUserProvider
+      refreshTokenUserProvider: tokensUserProvider({
+        tokens: 'refreshTokens',
+        model: () => import('#models/user'),
+      }),
       // content is a function that takes the user and returns the content of the token, it can be optional, by default it returns only the user id
       content: <T>(user: JwtGuardUser<T>): JwtContent => {
         return {
@@ -81,13 +87,13 @@ const authConfig = defineConfig({
 })
 ```
 
-`tokenName` is the name of the token passed as a cookie, it can be optional, by default it is `token`.
+`tokenName` is the name of the jwt token passed as a cookie, it can be optional, by default it is `token`.
 
 ```typescript
 tokenName: 'custom-name'
 ```
 
-`tokenExpiresIn` is the time before the token expires it can be a string or a number and it can be optional.
+`tokenExpiresIn` is the time before the jwt token expires it can be a string or a number and it can be optional.
 
 ```typescript
 // string
@@ -103,6 +109,67 @@ useCookies: true
 ```
 
 If you just want to use jwt with the bearer token no need to set `useCookies` to `false` you can just remove it.
+
+## Refresh Tokens
+
+To use refresh tokens, you have to set the `refreshTokenUserProvider` in the guard configuration, see the example above.
+
+Create a new AdonisJS migration file and run it to create the `jwt_refresh_tokens` table:
+
+```typescript
+import { BaseSchema } from '@adonisjs/lucid/schema'
+
+export default class extends BaseSchema {
+  protected tableName = 'jwt_refresh_tokens'
+
+  async up() {
+    this.schema.createTable(this.tableName, (table) => {
+      table.increments()
+      table.integer('tokenable_id').notNullable().unsigned()
+      table.string('type').notNullable()
+      table.string('name').nullable()
+      table.string('hash', 80).notNullable()
+      table.text('abilities').notNullable()
+      table.timestamp('created_at', { precision: 6, useTz: true }).notNullable()
+      table.timestamp('updated_at', { precision: 6, useTz: true }).notNullable()
+      table.timestamp('expires_at', { precision: 6, useTz: true }).nullable()
+      table.timestamp('last_used_at', { precision: 6, useTz: true }).nullable()
+    })
+  }
+
+  async down() {
+    this.schema.dropTable(this.tableName)
+  }
+}
+```
+
+And add the `refreshTokens` property to your User model:
+
+```typescript
+import { column, BaseModel } from '@adonisjs/lucid/orm'
+import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
+
+export default class User extends BaseModel {
+  @column({ isPrimary: true })
+  declare id: number
+
+  @column()
+  declare username: string
+
+  @column()
+  declare email: string
+
+  @column()
+  declare password: string
+
+  static refreshTokens = DbAccessTokensProvider.forModel(User, {
+    prefix: 'rt_',
+    table: 'jwt_refresh_tokens',
+    type: 'jwt_refresh_token',
+    tokenSecretLength: 40,
+  })
+}
+```
 
 ## Authentication
 
@@ -128,6 +195,26 @@ router.get('/', async ({ auth }) => {
   return auth.use('jwt').getUserOrFail()
 })
 .use(middleware.auth({ guards: ['jwt'] }))
+
+// to create a refresh token to a given user
+import User from '#models/user'
+const user  = auth.getUserOrFail()
+const refreshToken = await User.refreshTokens.create(user)
+
+// if you use the refresh token
+router.post('jwt/refresh', async ({ auth }) => {
+  // this will authenticate the user using the refresh token
+  // it will delete the old refresh token and generate a new one
+  const user = await auth.use('jwt').authenticateWithRefreshToken()
+  const newRefreshToken = user.currentToken
+  const newToken = await auth.use('jwt').generate(user)
+
+  return response.ok({
+    token: newToken,
+    refreshToken: newRefreshToken,
+    ...user.serialize(),
+  })
+})
 ```
 
 ## Security

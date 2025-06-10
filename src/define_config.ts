@@ -4,9 +4,11 @@ import { JwtGuardUser, JwtUserProviderContract } from './types.js'
 import { JwtGuard } from './jwt.js'
 import { Secret } from '@adonisjs/core/helpers'
 import type { StringValue } from 'ms'
+import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
+  refreshTokenUserProvider?: AccessTokensUserProviderContract<unknown>
   tokenName?: string
   tokenExpiresIn?: number | StringValue
   useCookies?: boolean
@@ -18,6 +20,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
       const appKey = (app.config.get('app.appKey') as Secret<string>).release()
       const options = {
         secret: config.secret ?? appKey,
+        refreshTokenUserProvider: config.refreshTokenUserProvider,
         tokenName: config.tokenName,
         expiresIn: config.tokenExpiresIn,
         useCookies: config.useCookies,

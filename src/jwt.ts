@@ -3,12 +3,17 @@ import { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
 import jwt from 'jsonwebtoken'
 import { JwtUserProviderContract, JwtGuardOptions } from './types.js'
+import { Secret } from '@adonisjs/core/helpers'
+import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 
 export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
   implements GuardContract<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
 {
   #ctx: HttpContext
   #userProvider: UserProvider
+  #refreshTokenUserProvider?: AccessTokensUserProviderContract<
+    UserProvider[typeof symbols.PROVIDER_REAL_USER]
+  >
   #options: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
   #tokenName: string
 
@@ -20,6 +25,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     this.#ctx = ctx
     this.#userProvider = userProvider
     this.#options = option
+    this.#refreshTokenUserProvider = this.#options.refreshTokenUserProvider
     if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
     this.#tokenName = this.#options.tokenName ?? 'token'
   }
@@ -168,6 +174,92 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
       currentToken: string
     }
     this.user!.currentToken = token
+    return this.getUserOrFail()
+  }
+
+  async authenticateWithRefreshToken(): Promise<
+    UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string }
+  > {
+    /**
+     * Avoid re-authentication when it has been done already
+     * for the given request
+     */
+    if (this.authenticationAttempted) {
+      return this.getUserOrFail()
+    }
+    this.authenticationAttempted = true
+
+    /**
+     * Ensure the refresh token user provider is defined
+     */
+    if (!this.#refreshTokenUserProvider) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+    /**
+     * Ensure the auth header exists
+     */
+    const authHeader = this.#ctx.request.header('authorization')
+    if (!authHeader) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    /**
+     * Split the header value and read the token from it
+     */
+    const [, refreshToken] = authHeader!.split('Bearer ')
+    if (!refreshToken) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    const accessToken = await this.#refreshTokenUserProvider.verifyToken(new Secret(refreshToken))
+
+    if (!accessToken) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    /**
+     * Fetch the user by user ID
+     */
+    const providerUser = await this.#refreshTokenUserProvider.findById(accessToken.tokenableId)
+    if (!providerUser) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    this.isAuthenticated = true
+    this.user = providerUser.getOriginal() as UserProvider[typeof symbols.PROVIDER_REAL_USER] & {
+      currentToken: string
+    }
+
+    /**
+     * Delete the refresh token from the database
+     */
+    const isDeleted = await this.#refreshTokenUserProvider.invalidateToken(new Secret(refreshToken))
+    if (!isDeleted) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    const newRefreshToken = await this.#refreshTokenUserProvider.createToken(this.user)
+
+    if (!newRefreshToken.value) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    this.user.currentToken = newRefreshToken.value?.release()
+
     return this.getUserOrFail()
   }
 
