@@ -8,7 +8,7 @@ import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_to
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
-  refreshTokenUserProvider?: AccessTokensUserProviderContract<UserProvider>
+  refreshTokenUserProvider?: AccessTokensUserProviderContract<unknown>
   tokenName?: string
   tokenExpiresIn?: number | StringValue
   useCookies?: boolean
