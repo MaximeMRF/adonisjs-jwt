@@ -177,9 +177,9 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     return this.getUserOrFail()
   }
 
-  async authenticateWithRefreshToken(): Promise<
-    UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string }
-  > {
+  async authenticateWithRefreshToken(
+    name?: string
+  ): Promise<UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string }> {
     /**
      * Avoid re-authentication when it has been done already
      * for the given request
@@ -241,6 +241,11 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     }
 
     /**
+     * Get the same abilities for the new refresh token
+     */
+    const abilities = accessToken.abilities
+
+    /**
      * Delete the refresh token from the database
      */
     const isDeleted = await this.#refreshTokenUserProvider.invalidateToken(new Secret(refreshToken))
@@ -250,7 +255,9 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
       })
     }
 
-    const newRefreshToken = await this.#refreshTokenUserProvider.createToken(this.user)
+    const newRefreshToken = await this.#refreshTokenUserProvider.createToken(this.user, abilities, {
+      name,
+    })
 
     if (!newRefreshToken.value) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
