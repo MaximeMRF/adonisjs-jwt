@@ -204,8 +204,9 @@ const refreshToken = await User.refreshTokens.create(user)
 // if you use the refresh token
 router.post('jwt/refresh', async ({ auth }) => {
   // this will authenticate the user using the refresh token
-  // it will delete the old refresh token and generate a new one
-  const user = await auth.use('jwt').authenticateWithRefreshToken()
+  // it will delete the old refresh token and generate a new one with the same abilities
+  // You could pass a name for the new token as well
+  const user = await auth.use('jwt').authenticateWithRefreshToken('optional_name')
   const newRefreshToken = user.currentToken
   const newToken = await auth.use('jwt').generate(user)
 
