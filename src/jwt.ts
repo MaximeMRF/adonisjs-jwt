@@ -177,7 +177,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     return this.getUserOrFail()
   }
 
-  async authenticateWithRefreshToken(
+  async generateWithRefreshToken(
     name?: string
   ): Promise<UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string }> {
     /**
@@ -197,25 +197,8 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
         guardDriverName: this.driverName,
       })
     }
-    /**
-     * Ensure the auth header exists
-     */
-    const authHeader = this.#ctx.request.header('authorization')
-    if (!authHeader) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
-    }
 
-    /**
-     * Split the header value and read the token from it
-     */
-    const [, refreshToken] = authHeader!.split('Bearer ')
-    if (!refreshToken) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
-    }
+    const refreshToken = await this.#findRefreshToken()
 
     const accessToken = await this.#refreshTokenUserProvider.verifyToken(new Secret(refreshToken))
 
@@ -268,6 +251,38 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     this.user.currentToken = newRefreshToken.value?.release()
 
     return this.getUserOrFail()
+  }
+
+  async #findRefreshToken(): Promise<string> {
+    const cookieName = 'refreshToken'
+    const cookieToken = this.#ctx.request.cookie(cookieName)
+    if (cookieToken) {
+      return cookieToken
+    }
+    
+    const bodyToken = this.#ctx.request.input('refreshToken')
+    if (bodyToken) {
+      return bodyToken
+    }
+    
+    const authHeader = this.#ctx.request.header('authorization')
+
+    if (!authHeader) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    if (authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.slice(7).trim()
+      if (token) {
+        return token
+      }
+    }
+
+    throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+      guardDriverName: this.driverName,
+    })
   }
 
   /**

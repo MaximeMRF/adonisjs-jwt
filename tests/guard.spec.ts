@@ -64,7 +64,7 @@ test.group('Jwt guard | authenticate', () => {
 
     ctx.request.request.headers.authorization = `Bearer ${refreshToken.value?.release()}`
 
-    const userAuthenticated = await guard.authenticateWithRefreshToken()
+    const userAuthenticated = await guard.generateWithRefreshToken()
 
     assert.isTrue(guard.isAuthenticated)
     assert.isTrue(guard.authenticationAttempted)
@@ -82,7 +82,7 @@ test.group('Jwt guard | authenticate', () => {
       secret: 'thisisasecret',
     })
 
-    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    const [result] = await Promise.allSettled([guard.generateWithRefreshToken()])
     assert.equal(result!.status, 'rejected')
     if (result!.status === 'rejected') {
       assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
@@ -132,7 +132,7 @@ test.group('Jwt guard | authenticate', () => {
       })
     }
 
-    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    const [result] = await Promise.allSettled([guard.generateWithRefreshToken()])
     assert.equal(result!.status, 'rejected')
     if (result!.status === 'rejected') {
       assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
@@ -183,7 +183,7 @@ test.group('Jwt guard | authenticate', () => {
     }
 
     ctx.request.request.headers.authorization = `foo bar`
-    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    const [result] = await Promise.allSettled([guard.generateWithRefreshToken()])
     assert.equal(result!.status, 'rejected')
     if (result!.status === 'rejected') {
       assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
@@ -301,8 +301,8 @@ test.group('Jwt guard | authenticate', () => {
     })
     const refreshToken = await User.refreshTokens.create(user)
     ctx.request.request.headers.authorization = `Bearer ${refreshToken.value?.release()}`
-    await guard.authenticateWithRefreshToken()
-    const authenticatedUser = await guard.authenticateWithRefreshToken()
+    await guard.generateWithRefreshToken()
+    const authenticatedUser = await guard.generateWithRefreshToken()
     assert.isTrue(guard.isAuthenticated)
     assert.isTrue(guard.authenticationAttempted)
     assert.equal(guard.user, authenticatedUser)
@@ -357,7 +357,7 @@ test.group('Jwt guard | authenticate', () => {
     const refreshToken = await User.refreshTokens.create(user)
     await user.delete()
     ctx.request.request.headers.authorization = `Bearer ${refreshToken.value?.release()}`
-    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    const [result] = await Promise.allSettled([guard.generateWithRefreshToken()])
     assert.equal(result!.status, 'rejected')
     if (result!.status === 'rejected') {
       assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
@@ -407,7 +407,7 @@ test.group('Jwt guard | authenticate', () => {
     }
 
     ctx.request.request.headers.authorization = `Bearer abcd`
-    const [result] = await Promise.allSettled([guard.authenticateWithRefreshToken()])
+    const [result] = await Promise.allSettled([guard.generateWithRefreshToken()])
     assert.equal(result!.status, 'rejected')
     if (result!.status === 'rejected') {
       assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
