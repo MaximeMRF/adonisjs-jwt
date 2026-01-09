@@ -6,9 +6,9 @@ import { JwtUserProviderContract, JwtGuardOptions } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
 import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 
-export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
-  implements GuardContract<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
-{
+export class JwtGuard<
+  UserProvider extends JwtUserProviderContract<unknown>,
+> implements GuardContract<UserProvider[typeof symbols.PROVIDER_REAL_USER]> {
   #ctx: HttpContext
   #userProvider: UserProvider
   #refreshTokenUserProvider?: AccessTokensUserProviderContract<
