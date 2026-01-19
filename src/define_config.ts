@@ -11,7 +11,10 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   refreshTokenUserProvider?: AccessTokensUserProviderContract<unknown>
   tokenName?: string
   tokenExpiresIn?: number | StringValue
+  refreshTokenExpiresIn?: number | StringValue
   useCookies?: boolean
+  useCookiesForRefreshToken?: boolean
+  refreshTokenAbilities?: string[]
   secret?: string
   content: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
@@ -23,7 +26,10 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
         refreshTokenUserProvider: config.refreshTokenUserProvider,
         tokenName: config.tokenName,
         expiresIn: config.tokenExpiresIn,
+        refreshTokenExpiresIn: config.refreshTokenExpiresIn,
         useCookies: config.useCookies,
+        useCookiesForRefreshToken: config.useCookiesForRefreshToken,
+        refreshTokenAbilities: config.refreshTokenAbilities,
         content: config.content,
       }
       return (ctx) => new JwtGuard(ctx, config.provider, options)

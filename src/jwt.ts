@@ -2,13 +2,14 @@ import { symbols, errors } from '@adonisjs/auth'
 import { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
 import jwt from 'jsonwebtoken'
+import type { StringValue } from 'ms'
 import { JwtUserProviderContract, JwtGuardOptions } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
 import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 
-export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
-  implements GuardContract<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
-{
+export class JwtGuard<
+  UserProvider extends JwtUserProviderContract<unknown>,
+> implements GuardContract<UserProvider[typeof symbols.PROVIDER_REAL_USER]> {
   #ctx: HttpContext
   #userProvider: UserProvider
   #refreshTokenUserProvider?: AccessTokensUserProviderContract<
@@ -16,6 +17,7 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
   >
   #options: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
   #tokenName: string
+  #refreshTokenName: string = 'refreshToken'
 
   constructor(
     ctx: HttpContext,
@@ -72,8 +74,28 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
         : {}
     )
 
+    let refreshToken
+    if (this.#refreshTokenUserProvider) {
+      const generatedRefreshToken = await this.#refreshTokenUserProvider.createToken(
+        user,
+        this.#options.refreshTokenAbilities ?? [],
+        this.#options.refreshTokenExpiresIn
+          ? {
+              expiresIn: this.#options.refreshTokenExpiresIn,
+            }
+          : undefined
+      )
+      refreshToken = generatedRefreshToken.value!.release()
+    }
+
     if (this.#options.useCookies) {
-      return this.#ctx.response.cookie(`${this.#tokenName}`, token, {
+      this.#ctx.response.cookie(`${this.#tokenName}`, token, {
+        httpOnly: true,
+      })
+    }
+
+    if (this.#options.useCookiesForRefreshToken && refreshToken) {
+      this.#ctx.response.cookie(`${this.#refreshTokenName}`, refreshToken, {
         httpOnly: true,
       })
     }
@@ -82,6 +104,8 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
       type: 'bearer',
       token: token,
       expiresIn: this.#options.expiresIn,
+      refreshToken: refreshToken,
+      refreshTokenExpiresIn: this.#options.refreshTokenExpiresIn,
     }
   }
 
@@ -177,28 +201,27 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     return this.getUserOrFail()
   }
 
-  async generateWithRefreshToken(
-    name?: string
-  ): Promise<UserProvider[typeof symbols.PROVIDER_REAL_USER] & { currentToken: string }> {
-    /**
-     * Avoid re-authentication when it has been done already
-     * for the given request
-     */
-    if (this.authenticationAttempted) {
-      return this.getUserOrFail()
-    }
+  async generateWithRefreshToken(refreshToken?: string): Promise<
+    | {
+        type: string
+        token: string
+        expiresIn: number | StringValue | undefined
+        refreshToken: string | undefined
+        refreshTokenExpiresIn: number | StringValue | undefined
+      }
+    | undefined
+  > {
     this.authenticationAttempted = true
 
-    /**
-     * Ensure the refresh token user provider is defined
-     */
     if (!this.#refreshTokenUserProvider) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })
     }
 
-    const refreshToken = await this.#findRefreshToken()
+    if (!refreshToken) {
+      refreshToken = await this.#findRefreshToken()
+    }
 
     const accessToken = await this.#refreshTokenUserProvider.verifyToken(new Secret(refreshToken))
 
@@ -224,11 +247,6 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
     }
 
     /**
-     * Get the same abilities for the new refresh token
-     */
-    const abilities = accessToken.abilities
-
-    /**
      * Delete the refresh token from the database
      */
     const isDeleted = await this.#refreshTokenUserProvider.invalidateToken(new Secret(refreshToken))
@@ -238,51 +256,56 @@ export class JwtGuard<UserProvider extends JwtUserProviderContract<unknown>>
       })
     }
 
-    const newRefreshToken = await this.#refreshTokenUserProvider.createToken(this.user, abilities, {
-      name,
-    })
-
-    if (!newRefreshToken.value) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
-    }
-
-    this.user.currentToken = newRefreshToken.value?.release()
-
-    return this.getUserOrFail()
+    return this.generate(this.user)
   }
 
   async #findRefreshToken(): Promise<string> {
-    const cookieName = 'refreshToken'
-    const cookieToken = this.#ctx.request.cookie(cookieName)
-    if (cookieToken) {
-      return cookieToken
-    }
-    
     const bodyToken = this.#ctx.request.input('refreshToken')
     if (bodyToken) {
       return bodyToken
     }
-    
-    const authHeader = this.#ctx.request.header('authorization')
 
-    if (!authHeader) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
+    if (this.#options.useCookiesForRefreshToken) {
+      const cookieToken = this.#ctx.request.cookie(this.#refreshTokenName)
+      if (cookieToken) {
+        return cookieToken
+      }
     }
 
-    if (authHeader.toLowerCase().startsWith('bearer ')) {
-      const token = authHeader.slice(7).trim()
-      if (token) {
-        return token
+    const authHeader = this.#ctx.request.header('authorization')
+    if (authHeader) {
+      if (authHeader.toLowerCase().startsWith('bearer ')) {
+        const token = authHeader.slice(7).trim()
+        if (token) {
+          return token
+        }
       }
     }
 
     throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
       guardDriverName: this.driverName,
     })
+  }
+
+  /**
+   * Revoke the refresh token
+   */
+  async revoke(refreshToken?: string) {
+    if (!this.#refreshTokenUserProvider) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    if (!refreshToken) {
+      try {
+        refreshToken = await this.#findRefreshToken()
+      } catch {
+        return
+      }
+    }
+
+    await this.#refreshTokenUserProvider.invalidateToken(new Secret(refreshToken))
   }
 
   /**

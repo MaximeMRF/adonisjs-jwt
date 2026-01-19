@@ -75,6 +75,12 @@ const authConfig = defineConfig({
         tokens: 'refreshTokens',
         model: () => import('#models/user'),
       }),
+      // optionally set the expiry for the refresh token
+      refreshTokenExpiresIn: '7d',
+      // ability to separate cookie usage for refresh token
+      useCookiesForRefreshToken: true,
+      // limit the abilities of the refresh token
+      refreshTokenAbilities: ['refresh_token'],
       // content is a function that takes the user and returns the content of the token, it can be optional, by default it returns only the user id
       content: <T>(user: JwtGuardUser<T>): JwtContent => {
         return {
@@ -180,7 +186,9 @@ router.post('login', async ({ request, auth }) => {
   const { email, password } = request.all()
   const user = await User.verifyCredentials(email, password)
 
-  // to generate a token
+  // to generate a token (and refresh token if configured)
+  // this returns { type, token, expiresIn, refreshToken, refreshTokenExpiresIn }
+  // if useCookies is true, it sets cookies on the response instead
   return await auth.use('jwt').generate(user)
 })
 
@@ -196,25 +204,21 @@ router.get('/', async ({ auth }) => {
 })
 .use(middleware.auth({ guards: ['jwt'] }))
 
-// to create a refresh token to a given user
-import User from '#models/user'
-const user  = auth.getUserOrFail()
-const refreshToken = await User.refreshTokens.create(user)
-
 // if you use the refresh token
 router.post('jwt/refresh', async ({ auth }) => {
   // this will authenticate the user using the refresh token
-  // it will delete the old refresh token and generate a new one with the same abilities
-  // You could pass a name for the new token as well
-  const user = await auth.use('jwt').generateWithRefreshToken('optional_name')
-  const newRefreshToken = user.currentToken
-  const newToken = await auth.use('jwt').generate(user)
+  // it will delete the old refresh token and generate a new one
+  // it accepts an optional refresh token, otherwise it looks in:
+  // 1. request body 'refreshToken'
+  // 2. cookies (if enabled)
+  // 3. Authorization header
+  return await auth.use('jwt').generateWithRefreshToken()
+})
 
-  return response.ok({
-    token: newToken,
-    refreshToken: newRefreshToken,
-    ...user.serialize(),
-  })
+// to logout (revoke refresh token)
+router.post('logout', async ({ auth }) => {
+  await auth.use('jwt').revoke()
+  return { message: 'Logged out' }
 })
 ```
 

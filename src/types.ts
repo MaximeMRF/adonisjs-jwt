@@ -50,6 +50,9 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string
   expiresIn?: number | StringValue
+  refreshTokenExpiresIn?: number | StringValue
   useCookies?: boolean
+  useCookiesForRefreshToken?: boolean
+  refreshTokenAbilities?: string[]
   content?: (user: JwtGuardUser<RealUser>) => Record<string, any>
 }
