@@ -43,7 +43,7 @@
     "@adonisjs/tsconfig": "^1.4.1",
     "@japa/assert": "^4.2.0",
     "@japa/file-system": "^3.0.0",
-    "@japa/runner": "^4.5.0",
+    "@japa/runner": "^5.3.0",
     "@swc/core": "^1.15.8",
     "@types/node": "^22.15.18",
     "c8": "^10.1.3",
