@@ -39,9 +39,6 @@ test.group('Jwt guard | JWKS', (group) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    // Ensure user exists in provider (JwtFakeUserProvider usually has id:1 by default or we can look it up)
-    // Actually JwtFakeUserProvider.findById(1) returns a user.
-
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },

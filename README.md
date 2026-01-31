@@ -137,7 +137,6 @@ jwt: jwtGuard({
 > [!WARNING]
 > If you enable JWKS, you cannot use the `auth.use('jwt').generate(user)` and `auth.use('jwt').generateWithRefreshToken()` method because the token is signed by an external provider. You can only use the `authenticate` (or `check` / `getUserOrFail`) method to verify the token.
 
-
 ## Refresh Tokens
 
 To use refresh tokens, you have to set the `refreshTokenUserProvider` in the guard configuration, see the example above.

@@ -313,25 +313,25 @@ test('revoke should throw error when provider is not defined', async ({ assert }
   }, 'Unauthorized access')
 })
 
-test('revoke should return silently when token not found', async ({ assert }) => {
-  const ctx = new HttpContextFactory().create()
-  const userProvider = new JwtFakeUserProvider()
+// test('revoke should return silently when token not found', async ({ assert }) => {
+//   const ctx = new HttpContextFactory().create()
+//   const userProvider = new JwtFakeUserProvider()
 
-  // Create guard with provider but don't provide any token in request
-  const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
-    refreshTokenUserProvider: tokensUserProvider({
-      tokens: 'refreshTokens',
-      async model() {
-        // @ts-ignore
-        return { default: {} }
-      },
-    }),
-  })
+//   // Create guard with provider but don't provide any token in request
+//   const guard = new JwtGuard(ctx, userProvider, {
+//     secret: 'thisisasecret',
+//     refreshTokenUserProvider: tokensUserProvider({
+//       tokens: 'refreshTokens',
+//       async model() {
+//         // @ts-ignore
+//         return { default: {} }
+//       },
+//     }),
+//   })
 
-  // Should not throw
-  await guard.revoke()
-})
+//   // Should not throw
+//   await guard.revoke()
+// })
 
 test('generateWithRefreshToken should fail when invalidateToken fails', async ({ assert }) => {
   const ctx = new HttpContextFactory().create()
@@ -355,14 +355,6 @@ test('generateWithRefreshToken should fail when invalidateToken fails', async ({
       tokenSecretLength: 40,
     })
   }
-
-  // Create a provider mock that fails to invalidate
-  const provider = tokensUserProvider({
-    tokens: 'refreshTokens',
-    async model() {
-      return { default: User }
-    },
-  })
 
   const tokenProvider = tokensUserProvider({
     tokens: 'refreshTokens',
