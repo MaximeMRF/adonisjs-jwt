@@ -77,8 +77,8 @@ export class JwtGuard<
       this.#options.secret,
       this.#options.expiresIn
         ? {
-            expiresIn: this.#options.expiresIn,
-          }
+          expiresIn: this.#options.expiresIn,
+        }
         : {}
     )
 
@@ -89,8 +89,8 @@ export class JwtGuard<
         this.#options.refreshTokenAbilities ?? [],
         this.#options.refreshTokenExpiresIn
           ? {
-              expiresIn: this.#options.refreshTokenExpiresIn,
-            }
+            expiresIn: this.#options.refreshTokenExpiresIn,
+          }
           : undefined
       )
       refreshToken = generatedRefreshToken.value!.release()
@@ -179,23 +179,18 @@ export class JwtGuard<
 
     try {
       if (this.#jwksManager) {
-        console.log('decode with jwks')
         const decoded = jwt.decode(token, { complete: true })
         if (!decoded || !decoded.header || !decoded.header.kid) {
-          console.log('decode with jwks failed')
           throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
             guardDriverName: this.driverName,
           })
         }
         const key = await this.#jwksManager.getSigningKey(decoded.header.kid)
-        console.log('key', key)
-        payload = jwt.verify(token, key, { algorithms: ['RS256'] })
+        payload = jwt.verify(token, key)
       } else {
-        console.log('decode with secret')
         payload = jwt.verify(token, this.#options.secret)
       }
-    } catch (error) {
-      console.log(error)
+    } catch {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })
@@ -229,12 +224,12 @@ export class JwtGuard<
 
   async generateWithRefreshToken(refreshToken?: string): Promise<
     | {
-        type: string
-        token: string
-        expiresIn: number | StringValue | undefined
-        refreshToken: string | undefined
-        refreshTokenExpiresIn: number | StringValue | undefined
-      }
+      type: string
+      token: string
+      expiresIn: number | StringValue | undefined
+      refreshToken: string | undefined
+      refreshTokenExpiresIn: number | StringValue | undefined
+    }
     | undefined
   > {
     this.authenticationAttempted = true
