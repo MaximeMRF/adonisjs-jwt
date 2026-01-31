@@ -77,8 +77,8 @@ export class JwtGuard<
       this.#options.secret,
       this.#options.expiresIn
         ? {
-          expiresIn: this.#options.expiresIn,
-        }
+            expiresIn: this.#options.expiresIn,
+          }
         : {}
     )
 
@@ -89,8 +89,8 @@ export class JwtGuard<
         this.#options.refreshTokenAbilities ?? [],
         this.#options.refreshTokenExpiresIn
           ? {
-            expiresIn: this.#options.refreshTokenExpiresIn,
-          }
+              expiresIn: this.#options.refreshTokenExpiresIn,
+            }
           : undefined
       )
       refreshToken = generatedRefreshToken.value!.release()
@@ -224,12 +224,12 @@ export class JwtGuard<
 
   async generateWithRefreshToken(refreshToken?: string): Promise<
     | {
-      type: string
-      token: string
-      expiresIn: number | StringValue | undefined
-      refreshToken: string | undefined
-      refreshTokenExpiresIn: number | StringValue | undefined
-    }
+        type: string
+        token: string
+        expiresIn: number | StringValue | undefined
+        refreshToken: string | undefined
+        refreshTokenExpiresIn: number | StringValue | undefined
+      }
     | undefined
   > {
     this.authenticationAttempted = true
