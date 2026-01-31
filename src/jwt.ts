@@ -234,6 +234,12 @@ export class JwtGuard<
   > {
     this.authenticationAttempted = true
 
+    if (this.#options.jwks) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('JWKS is not supported for refresh token', {
+        guardDriverName: this.driverName,
+      })
+    }
+
     if (!this.#refreshTokenUserProvider) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,

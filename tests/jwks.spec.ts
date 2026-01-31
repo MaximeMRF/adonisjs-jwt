@@ -154,4 +154,20 @@ test.group('Jwt guard | JWKS', (group) => {
       await guard.generate(user!.getOriginal())
     }, "You can't use the auth.generate method with jwks")
   })
+
+  test('should throw error when calling generateWithRefreshToken with jwks enabled', async ({
+    assert,
+  }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri: 'https://example.com' },
+    })
+
+    await assert.rejects(async () => {
+      await guard.generateWithRefreshToken()
+    }, 'JWKS is not supported for refresh token')
+  })
 })
