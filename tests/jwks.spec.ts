@@ -170,4 +170,14 @@ test.group('Jwt guard | JWKS', (group) => {
       await guard.generateWithRefreshToken()
     }, 'JWKS is not supported for refresh token')
   })
+
+  test('should return the jwks client', async ({ assert }) => {
+    const { JwksManager } = await import('../src/jwks.js')
+    const manager = new JwksManager({
+      jwksUri: 'https://fake-auth.com/.well-known/jwks.json',
+    })
+    const client = manager.getClient()
+    assert.exists(client)
+    assert.property(client, 'getSigningKey')
+  })
 })

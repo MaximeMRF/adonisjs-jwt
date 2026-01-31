@@ -370,7 +370,7 @@ export class JwtGuard<
     const token: any = await this.generate(user)
     return {
       headers: {
-        authorization: `Bearer ${this.#options.useCookies ? token : token.token}`,
+        authorization: `Bearer ${token.token}`,
       },
     }
   }

@@ -792,4 +792,20 @@ test.group('Jwt tokens guard | authenticateAsClient', () => {
       /^Bearer ([a-zA-Z0-9_=]+)\.([a-zA-Z0-9_=]+)\.([a-zA-Z0-9_\-\+\/=]*)/
     )
   })
+
+  test('create bearer token for the given user with cookies', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret', useCookies: true })
+    const user = await userProvider.findById(1)
+    const response = await guard.authenticateAsClient(user!.getOriginal())
+
+    assert.property(response.headers, 'authorization')
+
+    assert.match(
+      response.headers!.authorization,
+      /^Bearer ([a-zA-Z0-9_=]+)\.([a-zA-Z0-9_=]+)\.([a-zA-Z0-9_\-\+\/=]*)/
+    )
+  })
 })
