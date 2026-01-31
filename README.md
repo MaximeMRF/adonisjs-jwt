@@ -116,6 +116,28 @@ useCookies: true
 
 If you just want to use jwt with the bearer token no need to set `useCookies` to `false` you can just remove it.
 
+## JWKS
+
+You can use JWKS to verify the token by setting the `jwks` option in the guard configuration.
+
+```typescript
+// ...
+jwt: jwtGuard({
+  // ...
+  jwks: {
+    jwksUri: 'https://your-auth-server/.well-known/jwks.json',
+    // you can pass any options accepted by jwks-rsa package
+    cache: true,
+    rateLimit: true,
+  },
+}),
+// ...
+```
+
+> [!WARNING]
+> If you enable JWKS, you cannot use the `auth.use('jwt').generate(user)` and `auth.use('jwt').generateWithRefreshToken()` method because the token is signed by an external provider. You can only use the `authenticate` (or `check` / `getUserOrFail`) method to verify the token.
+
+
 ## Refresh Tokens
 
 To use refresh tokens, you have to set the `refreshTokenUserProvider` in the guard configuration, see the example above.
