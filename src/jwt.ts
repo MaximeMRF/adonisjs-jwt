@@ -6,6 +6,7 @@ import type { StringValue } from 'ms'
 import { JwtUserProviderContract, JwtGuardOptions } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
 import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
+import { JwksManager } from './jwks.js'
 
 export class JwtGuard<
   UserProvider extends JwtUserProviderContract<unknown>,
@@ -18,6 +19,7 @@ export class JwtGuard<
   #options: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
   #tokenName: string
   #refreshTokenName: string = 'refreshToken'
+  #jwksManager?: JwksManager
 
   constructor(
     ctx: HttpContext,
@@ -30,6 +32,7 @@ export class JwtGuard<
     this.#refreshTokenUserProvider = this.#options.refreshTokenUserProvider
     if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
     this.#tokenName = this.#options.tokenName ?? 'token'
+    this.#jwksManager = this.#options.jwks ? new JwksManager(this.#options.jwks) : undefined
   }
   /**
    * A list of events and their types emitted by
@@ -63,6 +66,11 @@ export class JwtGuard<
    * Generate a JWT token for a given user.
    */
   async generate(user: UserProvider[typeof symbols.PROVIDER_REAL_USER]) {
+    if (this.#options.jwks) {
+      throw new errors.E_UNAUTHORIZED_ACCESS("You can't use the auth.generate method with jwks", {
+        guardDriverName: this.driverName,
+      })
+    }
     const providerUser = await this.#userProvider.createUserForGuard(user)
     const token = jwt.sign(
       this.#options.content!(providerUser),
@@ -170,14 +178,30 @@ export class JwtGuard<
     let payload
 
     try {
-      payload = jwt.verify(token, this.#options.secret)
+      if (this.#jwksManager) {
+        console.log('decode with jwks')
+        const decoded = jwt.decode(token, { complete: true })
+        if (!decoded || !decoded.header || !decoded.header.kid) {
+          console.log('decode with jwks failed')
+          throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+            guardDriverName: this.driverName,
+          })
+        }
+        const key = await this.#jwksManager.getSigningKey(decoded.header.kid)
+        console.log('key', key)
+        payload = jwt.verify(token, key, { algorithms: ['RS256'] })
+      } else {
+        console.log('decode with secret')
+        payload = jwt.verify(token, this.#options.secret)
+      }
     } catch (error) {
+      console.log(error)
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })
     }
 
-    if (typeof payload !== 'object' || !('userId' in payload)) {
+    if (!payload || typeof payload !== 'object' || !('userId' in payload)) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })
@@ -186,7 +210,9 @@ export class JwtGuard<
     /**
      * Fetch the user by user ID and save a reference to it
      */
-    const providerUser = await this.#userProvider.findById(payload.userId)
+    const providerUser = await this.#userProvider.findById(
+      (payload as { userId: string | number | BigInt }).userId
+    )
     if (!providerUser) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,

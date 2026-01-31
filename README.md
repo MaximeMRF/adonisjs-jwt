@@ -199,16 +199,18 @@ router.post('login', async ({ request, auth }) => {
 })
 
 // if the jwt guard is the default guard
-router.get('/', async ({ auth }) => {
-  return auth.getUserOrFail()
-})
-.use(middleware.auth())
+router
+  .get('/', async ({ auth }) => {
+    return auth.getUserOrFail()
+  })
+  .use(middleware.auth())
 
 // if the jwt guard is not the default guard
-router.get('/', async ({ auth }) => {
-  return auth.use('jwt').getUserOrFail()
-})
-.use(middleware.auth({ guards: ['jwt'] }))
+router
+  .get('/', async ({ auth }) => {
+    return auth.use('jwt').getUserOrFail()
+  })
+  .use(middleware.auth({ guards: ['jwt'] }))
 
 // if you use the refresh token
 router.post('jwt/refresh', async ({ auth }) => {
