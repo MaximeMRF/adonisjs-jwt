@@ -99,12 +99,14 @@ export class JwtGuard<
     if (this.#options.useCookies) {
       this.#ctx.response.cookie(`${this.#tokenName}`, token, {
         httpOnly: true,
+        maxAge: this.#options.expiresIn,
       })
     }
 
     if (this.#options.useCookiesForRefreshToken && refreshToken) {
       this.#ctx.response.cookie(`${this.#refreshTokenName}`, refreshToken, {
         httpOnly: true,
+        maxAge: this.#options.refreshTokenExpiresIn,
       })
     }
 
