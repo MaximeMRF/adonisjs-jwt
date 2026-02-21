@@ -395,7 +395,13 @@ test.group('Jwt guard | authenticate', () => {
     const userProvider = new JwtFakeUserProvider()
 
     const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret', useCookies: true })
-    ctx.request.request.headers.cookie = 'token=' + jwt.sign({ userId: 1 }, 'thisisasecret')
+    const token = jwt.sign({ userId: 1 }, 'thisisasecret')
+    ctx.request.cookiesList().token = token
+
+    ctx.request.cookie = (key: string) => {
+      const cookies = { token: token }
+      return (cookies as Record<string, string>)[key]
+    }
 
     const authenticatedUser = await guard.authenticate()
 
@@ -417,7 +423,13 @@ test.group('Jwt guard | authenticate', () => {
       useCookies: true,
       tokenName: 'custom',
     })
-    ctx.request.request.headers.cookie = 'custom=' + jwt.sign({ userId: 1 }, 'thisisasecret')
+    const token = jwt.sign({ userId: 1 }, 'thisisasecret')
+    ctx.request.cookiesList().custom = token
+
+    ctx.request.cookie = (key: string) => {
+      const cookies = { custom: token }
+      return (cookies as Record<string, string>)[key]
+    }
 
     const authenticatedUser = await guard.authenticate()
 

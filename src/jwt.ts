@@ -3,7 +3,7 @@ import { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
 import jwt from 'jsonwebtoken'
 import type { StringValue } from 'ms'
-import { JwtUserProviderContract, JwtGuardOptions } from './types.js'
+import { JwtUserProviderContract, JwtGuardOptions, JwtCookieOptions } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
 import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import { JwksManager } from './jwks.js'
@@ -20,6 +20,7 @@ export class JwtGuard<
   #tokenName: string
   #refreshTokenName: string = 'refreshToken'
   #jwksManager?: JwksManager
+  #cookieOptions?: JwtCookieOptions | undefined
 
   constructor(
     ctx: HttpContext,
@@ -33,6 +34,11 @@ export class JwtGuard<
     if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
     this.#tokenName = this.#options.tokenName ?? 'token'
     this.#jwksManager = this.#options.jwks ? new JwksManager(this.#options.jwks) : undefined
+    this.#cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      ...this.#options.cookie,
+    }
   }
   /**
    * A list of events and their types emitted by
@@ -98,14 +104,14 @@ export class JwtGuard<
 
     if (this.#options.useCookies) {
       this.#ctx.response.cookie(`${this.#tokenName}`, token, {
-        httpOnly: true,
+        ...this.#cookieOptions,
         maxAge: this.#options.expiresIn,
       })
     }
 
     if (this.#options.useCookiesForRefreshToken && refreshToken) {
       this.#ctx.response.cookie(`${this.#refreshTokenName}`, refreshToken, {
-        httpOnly: true,
+        ...this.#cookieOptions,
         maxAge: this.#options.refreshTokenExpiresIn,
       })
     }
@@ -136,18 +142,10 @@ export class JwtGuard<
     }
     this.authenticationAttempted = true
 
-    const cookieHeader = this.#ctx.request.request.headers.cookie
-    let token
-
     /**
-     * If cookies are enabled, then read the token from the cookies
+     * Try to read the token from the cookies.
      */
-    if (cookieHeader) {
-      const regex = new RegExp(`${this.#tokenName}=([^;]*)`)
-      token =
-        this.#ctx.request.cookie(`${this.#tokenName}`) ??
-        (this.#ctx.request.request.headers.cookie!.match(regex) || [])[1]
-    }
+    let token = this.#ctx.request.cookie(`${this.#tokenName}`)
 
     /**
      * If token is missing on cookies, then try to read it from the header authorization
