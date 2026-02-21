@@ -79,6 +79,11 @@ const authConfig = defineConfig({
       refreshTokenExpiresIn: '7d',
       // ability to separate cookie usage for refresh token
       useCookiesForRefreshToken: true,
+      // ability to configure the cookies options
+      cookie: {
+        httpOnly: true,
+        secure: true,
+      },
       // limit the abilities of the refresh token
       refreshTokenAbilities: ['refresh_token'],
       // content is a function that takes the user and returns the content of the token, it can be optional, by default it returns only the user id
@@ -115,6 +120,19 @@ useCookies: true
 ```
 
 If you just want to use jwt with the bearer token no need to set `useCookies` to `false` you can just remove it.
+
+You can also pass options to the cookies. Note that `maxAge` and `expires` are omitted from the options because they are automatically handled by the package based on the token validity (`tokenExpiresIn` and `refreshTokenExpiresIn`).
+By default, `httpOnly: true` and `secure: true` are enforced for better security, but you can override them using the `cookie` object configuration.
+
+```typescript
+cookie: {
+  httpOnly: true, // Default
+  secure: true,   // Default
+  path: '/',
+  sameSite: 'lax',
+  // maxAge and expires cannot be set here
+}
+```
 
 ## JWKS
 
