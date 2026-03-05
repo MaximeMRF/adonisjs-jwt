@@ -1,4 +1,4 @@
-import { Options, JwksClient } from 'jwks-rsa'
+import { type Options, JwksClient } from 'jwks-rsa'
 
 export class JwksManager {
   private client: JwksClient
