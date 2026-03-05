@@ -1,4 +1,4 @@
-import { JwtUserProviderContract } from '../src/types.js'
+import type { JwtUserProviderContract } from '../src/types.js'
 import { symbols } from '@adonisjs/auth'
 import jwt from 'jsonwebtoken'
 import type { StringValue } from 'ms'

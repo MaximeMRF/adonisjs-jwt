@@ -1,11 +1,11 @@
-import { GuardConfigProvider } from '@adonisjs/auth/types'
+import type { GuardConfigProvider } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
-import { JwtGuardUser, JwtUserProviderContract, JwtCookieOptions } from './types.js'
+import type { JwtGuardUser, JwtUserProviderContract, JwtCookieOptions } from './types.js'
 import { JwtGuard } from './jwt.js'
-import { Secret } from '@adonisjs/core/helpers'
+import type { Secret } from '@adonisjs/core/helpers'
 import type { StringValue } from 'ms'
-import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
-import { Options } from 'jwks-rsa'
+import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
+import type { Options } from 'jwks-rsa'
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider

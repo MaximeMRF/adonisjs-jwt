@@ -1,7 +1,7 @@
-import { symbols } from '@adonisjs/auth'
+import { type symbols } from '@adonisjs/auth'
 import type { StringValue } from 'ms'
-import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
-import { Options } from 'jwks-rsa'
+import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
+import type { Options } from 'jwks-rsa'
 import type { CookieOptions } from '@adonisjs/core/types/http'
 
 export type JwtCookieOptions = Omit<Partial<CookieOptions>, 'maxAge' | 'expires'>
