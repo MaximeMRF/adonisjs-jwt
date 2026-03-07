@@ -23,9 +23,12 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {
-      const appKey = (app.config.get('app.appKey') as Secret<string>).release()
+      const secretValue =
+      config.secret && typeof config.secret === 'object' && 'release' in config.secret
+        ? config.secret.release()
+        : config.secret
       const options = {
-        secret: config.secret ?? appKey,
+        secret: secretValue,
         refreshTokenUserProvider: config.refreshTokenUserProvider,
         tokenName: config.tokenName,
         expiresIn: config.tokenExpiresIn,
