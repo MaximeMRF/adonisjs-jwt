@@ -50,7 +50,7 @@ export type BaseJwtContent = {
 }
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
-  secret: string
+  secret: string | Secret<string>
   jwks?: Options
   refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string
