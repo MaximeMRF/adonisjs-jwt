@@ -1,8 +1,8 @@
 import { symbols } from '@adonisjs/auth'
-import type { StringValue } from 'ms'
 import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
-import { Options } from 'jwks-rsa'
 import type { CookieOptions } from '@adonisjs/core/types/http'
+import { Options } from 'jwks-rsa'
+import type { StringValue } from 'ms'
 
 export type JwtCookieOptions = Omit<Partial<CookieOptions>, 'maxAge' | 'expires'>
 
@@ -50,7 +50,7 @@ export type BaseJwtContent = {
 }
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
-  secret: string | Secret<string>
+  secret: string
   jwks?: Options
   refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string
