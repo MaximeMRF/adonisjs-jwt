@@ -1,11 +1,11 @@
 import { GuardConfigProvider } from '@adonisjs/auth/types'
-import type { HttpContext } from '@adonisjs/core/http'
-import { JwtGuardUser, JwtUserProviderContract, JwtCookieOptions } from './types.js'
-import { JwtGuard } from './jwt.js'
-import { Secret } from '@adonisjs/core/helpers'
-import type { StringValue } from 'ms'
 import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
+import { Secret } from '@adonisjs/core/helpers'
+import type { HttpContext } from '@adonisjs/core/http'
 import { Options } from 'jwks-rsa'
+import type { StringValue } from 'ms'
+import { JwtGuard } from './jwt.js'
+import { JwtCookieOptions, JwtGuardUser, JwtUserProviderContract } from './types.js'
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
@@ -16,16 +16,16 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   useCookies?: boolean
   useCookiesForRefreshToken?: boolean
   refreshTokenAbilities?: string[]
-  secret?: string
+  secret: string | Secret<string>
   content: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
   jwks?: Options
   cookie?: JwtCookieOptions
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
-    async resolver(_, app) {
-      const appKey = (app.config.get('app.appKey') as Secret<string>).release()
+    async resolver(_, _app) {
+      const secretValue = config.secret instanceof Secret ? config.secret.release() : config.secret
       const options = {
-        secret: config.secret ?? appKey,
+        secret: secretValue,
         refreshTokenUserProvider: config.refreshTokenUserProvider,
         tokenName: config.tokenName,
         expiresIn: config.tokenExpiresIn,
