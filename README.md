@@ -11,6 +11,13 @@
 
 > AdonisJS package to authenticate users using JWT tokens.
 
+## Compatibility & Versions
+
+| Package Version | AdonisJS Version | Node.js Required |
+| --- | --- | --- |
+| `v0.7.x` | `AdonisJS v6` | `>= 20.6.0` |
+| **`v0.8.x`** | **`AdonisJS v7`** | **`>= 24.0.0`** |
+
 ## Prerequisites
 
 You have to install the auth package from AdonisJS
@@ -19,12 +26,20 @@ You have to install the auth package from AdonisJS
 node ace add @adonisjs/auth
 ```
 
-## Setup
+## Setup (AdonisJS v7)
 
 Install the package:
 
 ```bash
 npm i @maximemrf/adonisjs-jwt
+```
+
+## Setup for AdonisJS v6
+
+If you are using AdonisJS v6, you have to install the `v0.7.x` version of the package:
+
+```bash
+npm i @maximemrf/adonisjs-jwt@0.7.1
 ```
 
 ## Usage
