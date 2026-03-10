@@ -1,11 +1,11 @@
 import { symbols, errors } from '@adonisjs/auth'
-import { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
+import type { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
 import jwt from 'jsonwebtoken'
 import type { StringValue } from 'ms'
-import { JwtUserProviderContract, JwtGuardOptions, JwtCookieOptions } from './types.js'
+import type { JwtUserProviderContract, JwtGuardOptions, JwtCookieOptions } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
-import { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
+import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import { JwksManager } from './jwks.js'
 
 export class JwtGuard<
