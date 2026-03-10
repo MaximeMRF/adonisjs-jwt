@@ -31,6 +31,7 @@ jobs:
         node-version:
           - 22.x
           - 23.x
+          - 24.x
     steps:
       - uses: actions/checkout@v6
       - name: Use Node.js ${{ matrix.node-version }}
@@ -48,6 +49,7 @@ jobs:
         node-version:
           - 22.x
           - 23.x
+          - 24.x
     steps:
       - uses: actions/checkout@v6
       - name: Use Node.js ${{ matrix.node-version }}
