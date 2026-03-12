@@ -7,6 +7,8 @@
   <a href="https://www.npmjs.com/package/@maximemrf/adonisjs-jwt"><img src="https://img.shields.io/npm/v/@maximemrf/adonisjs-jwt.svg?style=flat-square" alt="Version"></a>
   <a href="https://www.npmjs.com/package/@maximemrf/adonisjs-jwt"><img src="https://img.shields.io/npm/last-update/@maximemrf/adonisjs-jwt.svg?style=flat-square" alt="NPM Last Update"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/npm/l/@maximemrf/adonisjs-jwt.svg?style=flat-square" alt="License"></a>
+  <a href="https://adonisjs.com/"><img src="https://img.shields.io/badge/AdonisJS-v6-5A45FF.svg?style=flat-square" alt="AdonisV6"></a>
+  <a href="https://adonisjs.com/"><img src="https://img.shields.io/badge/AdonisJS-v7-5A45FF.svg?style=flat-square" alt="AdonisV7"></a>
 </p>
 
 > AdonisJS package to authenticate users using JWT tokens.
