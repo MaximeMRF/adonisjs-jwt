@@ -39,6 +39,31 @@ export class JwtGuard<
       secure: true,
       ...this.#options.cookie,
     }
+
+    const asymmetricPartial =
+      this.#options.privateKey !== undefined ||
+      this.#options.publicKey !== undefined ||
+      this.#options.algorithm !== undefined
+
+    if (asymmetricPartial && !this.#usesAsymmetric()) {
+      throw new Error(
+        'JwtGuard asymmetric mode requires `privateKey`, `publicKey`, and `algorithm` to be set together'
+      )
+    }
+
+    if (!this.#options.jwks && !this.#usesAsymmetric() && !this.#options.secret) {
+      throw new Error(
+        'JwtGuard requires `secret` (symmetric), or `privateKey` + `publicKey` + `algorithm` (asymmetric), or `jwks`'
+      )
+    }
+  }
+
+  #usesAsymmetric(): boolean {
+    return (
+      this.#options.privateKey !== undefined &&
+      this.#options.publicKey !== undefined &&
+      this.#options.algorithm !== undefined
+    )
   }
   /**
    * A list of events and their types emitted by
@@ -78,15 +103,16 @@ export class JwtGuard<
       })
     }
     const providerUser = await this.#userProvider.createUserForGuard(user)
-    const token = jwt.sign(
-      this.#options.content!(providerUser),
-      this.#options.secret,
-      this.#options.expiresIn
-        ? {
-            expiresIn: this.#options.expiresIn,
-          }
-        : {}
-    )
+
+    const signPayload = this.#options.content!(providerUser)
+    const expires = this.#options.expiresIn ? { expiresIn: this.#options.expiresIn } : {}
+
+    const token = this.#usesAsymmetric()
+      ? jwt.sign(signPayload, this.#options.privateKey!, {
+          ...expires,
+          algorithm: this.#options.algorithm,
+        })
+      : jwt.sign(signPayload, this.#options.secret!, expires)
 
     let refreshToken
     if (this.#refreshTokenUserProvider) {
@@ -187,8 +213,12 @@ export class JwtGuard<
         }
         const key = await this.#jwksManager.getSigningKey(decoded.header.kid)
         payload = jwt.verify(token, key)
+      } else if (this.#usesAsymmetric()) {
+        payload = jwt.verify(token, this.#options.publicKey!, {
+          algorithms: [this.#options.algorithm!],
+        })
       } else {
-        payload = jwt.verify(token, this.#options.secret)
+        payload = jwt.verify(token, this.#options.secret!)
       }
     } catch {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
