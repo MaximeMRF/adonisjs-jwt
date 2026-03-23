@@ -151,6 +151,29 @@ cookie: {
 }
 ```
 
+## Asymmetric signing (RSA / ECDSA)
+
+You can sign access tokens with a **private key** and verify them with a **public key** only. Other services can validate JWTs using the public key without receiving your signing secret.
+
+Set `privateKey`, `publicKey`, and `algorithm` together on `jwtGuard`. Supported algorithms: `RS256`, `RS384`, `RS512`, `ES256`, `ES384`, `ES512`.
+
+Do not set `secret` for this mode (the guard resolver omits it when asymmetric keys are configured). Asymmetric signing cannot be combined with `jwks`.
+
+```typescript
+import env from '#start/env'
+
+jwt: jwtGuard({
+  tokenExpiresIn: '15m',
+  privateKey: env.get('JWT_PRIVATE_KEY').replace(/\\n/g, '\n'),
+  publicKey: env.get('JWT_PUBLIC_KEY').replace(/\\n/g, '\n'),
+  algorithm: 'RS256',
+  content: (user) => ({ userId: user.getId() }),
+  provider: sessionUserProvider({
+    model: () => import('#models/user'),
+  }),
+}),
+```
+
 ## JWKS
 
 You can use JWKS to verify the token by setting the `jwks` option in the guard configuration.

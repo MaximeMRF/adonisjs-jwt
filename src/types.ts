@@ -1,4 +1,4 @@
-import type { symbols } from '@adonisjs/auth'
+import { symbols } from '@adonisjs/auth'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
@@ -49,8 +49,29 @@ export type BaseJwtContent = {
   userId: string | number | BigInt
 }
 
+/**
+ * Algorithms supported for asymmetric (RSA / ECDSA) JWT signing and verification.
+ * Use with `privateKey` + `publicKey` so access tokens can be verified elsewhere with only the public key.
+ */
+export type JwtAsymmetricAlgorithm = 'RS256' | 'RS384' | 'RS512' | 'ES256' | 'ES384' | 'ES512'
+
 export type JwtGuardOptions<RealUser extends any = unknown> = {
-  secret: string
+  /**
+   * Symmetric signing secret (HMAC). Used when asymmetric keys are not set.
+   */
+  secret?: string
+  /**
+   * PEM-encoded private key for signing access tokens (asymmetric mode).
+   */
+  privateKey?: string
+  /**
+   * PEM-encoded public key for verifying access tokens (asymmetric mode).
+   */
+  publicKey?: string
+  /**
+   * Required with `privateKey` and `publicKey`.
+   */
+  algorithm?: JwtAsymmetricAlgorithm
   jwks?: Options
   refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string

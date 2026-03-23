@@ -1,11 +1,44 @@
 import type { GuardConfigProvider } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
-import type { JwtGuardUser, JwtUserProviderContract, JwtCookieOptions } from './types.js'
+import type {
+  JwtAsymmetricAlgorithm,
+  JwtGuardUser,
+  JwtUserProviderContract,
+  JwtCookieOptions,
+} from './types.js'
 import { JwtGuard } from './jwt.js'
 import type { Secret } from '@adonisjs/core/helpers'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
+
+function validateAsymmetricConfig(config: {
+  privateKey?: string
+  publicKey?: string
+  algorithm?: JwtAsymmetricAlgorithm
+  jwks?: Options
+}) {
+  const partial =
+    config.privateKey !== undefined ||
+    config.publicKey !== undefined ||
+    config.algorithm !== undefined
+
+  if (!partial) {
+    return
+  }
+
+  if (!config.privateKey || !config.publicKey || !config.algorithm) {
+    throw new Error(
+      'JWT guard asymmetric mode requires `privateKey`, `publicKey`, and `algorithm` to be set together'
+    )
+  }
+
+  if (config.jwks) {
+    throw new Error(
+      'JWT guard cannot use `jwks` together with asymmetric `privateKey` / `publicKey`'
+    )
+  }
+}
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
@@ -17,15 +50,33 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   useCookiesForRefreshToken?: boolean
   refreshTokenAbilities?: string[]
   secret?: string
+  privateKey?: string
+  publicKey?: string
+  algorithm?: JwtAsymmetricAlgorithm
   content: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
   jwks?: Options
   cookie?: JwtCookieOptions
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {
+      validateAsymmetricConfig(config)
+
       const appKey = (app.config.get('app.appKey') as Secret<string>).release()
+      const usesAsymmetric =
+        config.privateKey !== undefined &&
+        config.publicKey !== undefined &&
+        config.algorithm !== undefined
+
       const options = {
-        secret: config.secret ?? appKey,
+        ...(usesAsymmetric
+          ? {
+              privateKey: config.privateKey,
+              publicKey: config.publicKey,
+              algorithm: config.algorithm,
+            }
+          : {
+              secret: config.secret ?? appKey,
+            }),
         refreshTokenUserProvider: config.refreshTokenUserProvider,
         tokenName: config.tokenName,
         expiresIn: config.tokenExpiresIn,

@@ -23,6 +23,7 @@
     "#database/*": "./database/*.js"
   },
   "scripts": {
+    "prepare": "tsc && npm run copy:templates",
     "clean": "del-cli build",
     "copy:templates": "copyfiles \"stubs/**/*.stub\" build",
     "typecheck": "tsc --noEmit",
