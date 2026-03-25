@@ -76,6 +76,13 @@
   },
   "author": "MaximeMRF",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MaximeMRF/adonisjs-jwt.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MaximeMRF/adonisjs-jwt/issues"
+  },
   "keywords": [
     "adonisjs",
     "adonis",
