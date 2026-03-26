@@ -15,6 +15,15 @@ function rsaPemPair() {
   return { publicKey, privateKey }
 }
 
+function ecPemPair() {
+  const { publicKey, privateKey } = generateKeyPairSync('ec', {
+    namedCurve: 'prime256v1',
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  })
+  return { publicKey, privateKey }
+}
+
 test.group('Jwt guard | asymmetric (RSA)', () => {
   test('generate and authenticate with RS256', async ({ assert }) => {
     const { publicKey, privateKey } = rsaPemPair()
@@ -74,5 +83,31 @@ test.group('Jwt guard | asymmetric (RSA)', () => {
         }),
       /privateKey.*publicKey.*algorithm/
     )
+  })
+})
+
+test.group('Jwt guard | asymmetric (ECDSA)', () => {
+  test('generate and authenticate with ES256', async ({ assert }) => {
+    const { publicKey, privateKey } = ecPemPair()
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      privateKey,
+      publicKey,
+      algorithm: 'ES256',
+    })
+
+    const user = await userProvider.findById(1)
+    const { token } = await guard.generate(user!.getOriginal())
+
+    const header = JSON.parse(Buffer.from(token.split('.')[0]!, 'base64url').toString())
+    assert.equal(header.alg, 'ES256')
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    await guard.authenticate()
+
+    assert.isTrue(guard.isAuthenticated)
+    assert.equal(guard.user!.id, 1)
   })
 })

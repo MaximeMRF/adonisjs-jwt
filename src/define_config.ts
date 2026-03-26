@@ -11,6 +11,7 @@ import type { Secret } from '@adonisjs/core/helpers'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
+import { createPrivateKey, createPublicKey } from 'node:crypto'
 
 function validateAsymmetricConfig(config: {
   privateKey?: string
@@ -37,6 +38,35 @@ function validateAsymmetricConfig(config: {
     throw new Error(
       'JWT guard cannot use `jwks` together with asymmetric `privateKey` / `publicKey`'
     )
+  }
+
+  const expectedKeyType = config.algorithm.startsWith('RS')
+    ? 'rsa'
+    : config.algorithm.startsWith('ES')
+      ? 'ec'
+      : null
+
+  if (!expectedKeyType) {
+    throw new Error(`Unsupported asymmetric algorithm "${config.algorithm}"`)
+  }
+
+  try {
+    const privateKey = createPrivateKey(config.privateKey)
+    const publicKey = createPublicKey(config.publicKey)
+
+    if (privateKey.asymmetricKeyType !== expectedKeyType) {
+      throw new Error(
+        `privateKey type "${privateKey.asymmetricKeyType}" does not match algorithm "${config.algorithm}"`
+      )
+    }
+    if (publicKey.asymmetricKeyType !== expectedKeyType) {
+      throw new Error(
+        `publicKey type "${publicKey.asymmetricKeyType}" does not match algorithm "${config.algorithm}"`
+      )
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid asymmetric key configuration'
+    throw new Error(`JWT guard asymmetric key validation failed: ${message}`)
   }
 }
 

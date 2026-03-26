@@ -1,4 +1,4 @@
-import { symbols } from '@adonisjs/auth'
+import { type symbols } from '@adonisjs/auth'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
