@@ -42,10 +42,10 @@
   "devDependencies": {
     "@adonisjs/assembler": "^8.4.0",
     "@adonisjs/auth": "^10.1.0",
-    "@adonisjs/core": "^7.3.2",
-    "@adonisjs/eslint-config": "^3.0.0",
+    "@adonisjs/core": "^7.3.3",
+    "@adonisjs/eslint-config": "^3.1.0",
     "@adonisjs/lucid": "^22.4.2",
-    "@adonisjs/prettier-config": "^1.4.5",
+    "@adonisjs/prettier-config": "^1.5.0",
     "@adonisjs/tsconfig": "^2.0.0",
     "@japa/assert": "^4.2.0",
     "@japa/file-system": "^3.0.0",
