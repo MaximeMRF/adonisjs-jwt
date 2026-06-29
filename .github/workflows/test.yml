@@ -8,7 +8,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install
         run: npm install
       - name: Run lint
@@ -17,7 +17,7 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install
         run: npm install
       - name: Run typecheck
@@ -33,7 +33,7 @@ jobs:
           - 23.x
           - 24.x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6
         with:
@@ -51,7 +51,7 @@ jobs:
           - 23.x
           - 24.x
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v6
         with:
