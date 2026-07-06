@@ -63,7 +63,7 @@ export class JwtGuard<
       )
     }
 
-    if (!this.#options.jwks && !usesAsymmetric && !this.#options.secret) {
+    if (!this.#options.driver && !this.#options.jwks && !usesAsymmetric && !this.#options.secret) {
       throw new Error(
         'JwtGuard requires `secret` (symmetric), or `privateKey` + `publicKey` + `algorithm` (asymmetric), or `jwks`'
       )
