@@ -1,5 +1,5 @@
 import { test } from '@japa/runner'
-import { JwtGuard } from '../src/jwt.js'
+import { JwtGuard } from '../src/guard.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import jwt from 'jsonwebtoken'

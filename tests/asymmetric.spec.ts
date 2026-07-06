@@ -1,7 +1,7 @@
 import { test } from '@japa/runner'
 import { generateKeyPairSync } from 'node:crypto'
 import jwt from 'jsonwebtoken'
-import { JwtGuard } from '../src/jwt.js'
+import { JwtGuard } from '../src/guard.js'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { errors } from '@adonisjs/auth'

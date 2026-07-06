@@ -6,7 +6,7 @@ import type {
   JwtUserProviderContract,
   JwtCookieOptions,
 } from './types.js'
-import { JwtGuard } from './jwt.js'
+import { JwtGuard } from './guard.js'
 import type { Secret } from '@adonisjs/core/helpers'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
