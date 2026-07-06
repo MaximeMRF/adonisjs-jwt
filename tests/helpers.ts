@@ -3,7 +3,6 @@ import { getActiveTest } from '@japa/runner'
 import { BaseModel } from '@adonisjs/lucid/orm'
 import { AppFactory } from '@adonisjs/core/factories/app'
 import { mkdir, rm } from 'node:fs/promises'
-import { join } from 'node:path'
 import { Emitter } from '@adonisjs/core/events'
 import { LoggerFactory } from '@adonisjs/core/factories/logger'
 import { Database } from '@adonisjs/lucid/database'
@@ -69,7 +68,7 @@ export async function createDatabase() {
         sqlite: {
           client: 'sqlite3',
           connection: {
-            filename: join(test.context.fs.basePath, 'db.sqlite3'),
+            filename: ':memory:',
           },
         },
       },
