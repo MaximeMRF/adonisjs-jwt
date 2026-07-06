@@ -1,13 +1,15 @@
 import { symbols, errors } from '@adonisjs/auth'
 import type { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
-import jwt from 'jsonwebtoken'
 import type { StringValue } from 'ms'
 import type { JwtUserProviderContract, JwtGuardOptions, JwtCookieOptions } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
-import { JwksManager } from './jwks.js'
-import { createPrivateKey, createPublicKey } from 'node:crypto'
+import { SymmetricDriver } from './drivers/symmetric.js'
+import { AsymmetricDriver } from './drivers/asymmetric.js'
+import { JwksDriver } from './drivers/jwks.js'
+import type { JwtDriver } from './drivers/types.js'
+import { validateGuardOptions } from './validation.js'
 
 export class JwtGuard<
   UserProvider extends JwtUserProviderContract<unknown>,
@@ -20,7 +22,7 @@ export class JwtGuard<
   #options: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
   #tokenName: string
   #refreshTokenName: string = 'refreshToken'
-  #jwksManager?: JwksManager
+  #driver: JwtDriver
   #cookieOptions?: JwtCookieOptions | undefined
 
   constructor(
@@ -34,115 +36,62 @@ export class JwtGuard<
     this.#refreshTokenUserProvider = this.#options.refreshTokenUserProvider
     if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
     this.#tokenName = this.#options.tokenName ?? 'token'
-    this.#jwksManager = this.#options.jwks ? new JwksManager(this.#options.jwks) : undefined
     this.#cookieOptions = {
       httpOnly: true,
       secure: true,
       ...this.#options.cookie,
     }
 
-    const asymmetricPartial =
-      this.#options.privateKey !== undefined ||
-      this.#options.publicKey !== undefined ||
-      this.#options.algorithm !== undefined
+    validateGuardOptions(this.#options, 'JwtGuard')
 
-    if (asymmetricPartial && !this.#usesAsymmetric()) {
-      throw new Error(
-        'JwtGuard asymmetric mode requires `privateKey`, `publicKey`, and `algorithm` to be set together'
-      )
-    }
-
-    if (this.#options.jwks && this.#usesAsymmetric()) {
-      throw new Error(
-        'JwtGuard cannot use `jwks` together with asymmetric `privateKey` / `publicKey`'
-      )
-    }
-
-    if (!this.#options.jwks && !this.#usesAsymmetric() && !this.#options.secret) {
-      throw new Error(
-        'JwtGuard requires `secret` (symmetric), or `privateKey` + `publicKey` + `algorithm` (asymmetric), or `jwks`'
-      )
-    }
-
-    if (this.#usesAsymmetric()) {
-      this.#assertAsymmetricKeyMatchesAlgorithm()
-    }
-  }
-
-  #usesAsymmetric(): boolean {
-    return (
+    const usesAsymmetric =
       this.#options.privateKey !== undefined &&
       this.#options.publicKey !== undefined &&
       this.#options.algorithm !== undefined
-    )
-  }
 
-  #assertAsymmetricKeyMatchesAlgorithm() {
-    const algorithm = this.#options.algorithm!
-    const expectedKeyType = algorithm.startsWith('RS')
-      ? 'rsa'
-      : algorithm.startsWith('ES')
-        ? 'ec'
-        : null
-
-    if (!expectedKeyType) {
-      throw new Error(`Unsupported asymmetric algorithm "${algorithm}"`)
-    }
-
-    try {
-      const privateKey = createPrivateKey(this.#options.privateKey!)
-      const publicKey = createPublicKey(this.#options.publicKey!)
-
-      if (privateKey.asymmetricKeyType !== expectedKeyType) {
+    if (this.#options.driver) {
+      this.#driver = this.#options.driver
+    } else if (this.#options.jwks) {
+      this.#driver = new JwksDriver(this.#options.jwks)
+    } else if (usesAsymmetric) {
+      try {
+        this.#driver = new AsymmetricDriver({
+          privateKey: this.#options.privateKey!,
+          publicKey: this.#options.publicKey!,
+          algorithm: this.#options.algorithm!,
+        })
+      } catch (error) {
         throw new Error(
-          `privateKey type "${privateKey.asymmetricKeyType}" does not match algorithm "${algorithm}"`
+          `JwtGuard asymmetric key validation failed: ${error instanceof Error ? error.message : error}`
         )
       }
-
-      if (publicKey.asymmetricKeyType !== expectedKeyType) {
-        throw new Error(
-          `publicKey type "${publicKey.asymmetricKeyType}" does not match algorithm "${algorithm}"`
-        )
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Invalid asymmetric key configuration'
-      throw new Error(`JwtGuard asymmetric key validation failed: ${message}`)
+    } else {
+      this.#driver = new SymmetricDriver({
+        secret: this.#options.secret!,
+      })
     }
   }
 
   #signAccessToken(payload: Record<string, any>) {
-    const expires = this.#options.expiresIn ? { expiresIn: this.#options.expiresIn } : {}
-
-    if (this.#usesAsymmetric()) {
-      return jwt.sign(payload, this.#options.privateKey!, {
-        ...expires,
-        algorithm: this.#options.algorithm,
-      })
-    }
-
-    return jwt.sign(payload, this.#options.secret!, expires)
+    return this.#driver.sign(payload, { expiresIn: this.#options.expiresIn })
   }
 
   async #verifyAccessToken(token: string) {
-    if (this.#jwksManager) {
-      const decoded = jwt.decode(token, { complete: true })
-      if (!decoded || !decoded.header || !decoded.header.kid) {
-        throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-          guardDriverName: this.driverName,
-        })
-      }
-      const key = await this.#jwksManager.getSigningKey(decoded.header.kid)
-      return jwt.verify(token, key)
+    return this.#driver.verify(token)
+  }
+
+  #extractToken(): string | undefined {
+    const cookieToken = this.#ctx.request.cookie(this.#tokenName)
+    if (cookieToken) {
+      return cookieToken
     }
 
-    if (this.#usesAsymmetric()) {
-      return jwt.verify(token, this.#options.publicKey!, {
-        algorithms: [this.#options.algorithm!],
-      })
+    const authHeader = this.#ctx.request.header('authorization')
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      return authHeader.slice(7).trim()
     }
 
-    return jwt.verify(token, this.#options.secret!)
+    return undefined
   }
   /**
    * A list of events and their types emitted by
@@ -176,7 +125,7 @@ export class JwtGuard<
    * Generate a JWT token for a given user.
    */
   async generate(user: UserProvider[typeof symbols.PROVIDER_REAL_USER]) {
-    if (this.#options.jwks) {
+    if (!this.#driver.canSign) {
       throw new errors.E_UNAUTHORIZED_ACCESS("You can't use the auth.generate method with jwks", {
         guardDriverName: this.driverName,
       })
@@ -243,31 +192,11 @@ export class JwtGuard<
     /**
      * Try to read the token from the cookies.
      */
-    let token = this.#ctx.request.cookie(`${this.#tokenName}`)
-
-    /**
-     * If token is missing on cookies, then try to read it from the header authorization
-     */
+    const token = this.#extractToken()
     if (!token) {
-      /**
-       * Ensure the auth header exists
-       */
-      const authHeader = this.#ctx.request.header('authorization')
-      if (!authHeader) {
-        throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-          guardDriverName: this.driverName,
-        })
-      }
-
-      /**
-       * Split the header value and read the token from it
-       */
-      ;[, token] = authHeader!.split('Bearer ')
-      if (!token) {
-        throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-          guardDriverName: this.driverName,
-        })
-      }
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
     }
 
     /**
@@ -321,7 +250,7 @@ export class JwtGuard<
   > {
     this.authenticationAttempted = true
 
-    if (this.#options.jwks) {
+    if (!this.#driver.canSign) {
       throw new errors.E_UNAUTHORIZED_ACCESS('JWKS is not supported for refresh token', {
         guardDriverName: this.driverName,
       })

@@ -3,6 +3,7 @@ import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
 import type { CookieOptions } from '@adonisjs/core/types/http'
+import type { JwtDriver } from './drivers/types.js'
 
 export type JwtCookieOptions = Omit<Partial<CookieOptions>, 'maxAge' | 'expires'>
 
@@ -56,6 +57,7 @@ export type BaseJwtContent = {
 export type JwtAsymmetricAlgorithm = 'RS256' | 'RS384' | 'RS512' | 'ES256' | 'ES384' | 'ES512'
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
+  driver?: JwtDriver
   /**
    * Symmetric signing secret (HMAC). Used when asymmetric keys are not set.
    */

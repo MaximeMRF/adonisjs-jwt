@@ -383,3 +383,56 @@ test('generateWithRefreshToken should fail when invalidateToken fails', async ({
     await guard.generateWithRefreshToken()
   }, 'Unauthorized access')
 })
+
+test('revoke should find and invalidate token from body/header when not passed explicitly', async ({
+  assert,
+}) => {
+  const ctx = new HttpContextFactory().create()
+  const userProvider = new JwtFakeUserProvider()
+  const db = await createDatabase()
+  await createTables(db)
+
+  class User extends BaseModel {
+    @column({ isPrimary: true })
+    declare id: number
+    @column()
+    declare username: string
+    @column()
+    declare email: string
+    @column()
+    declare password: string
+    static refreshTokens = DbAccessTokensProvider.forModel(User, {
+      prefix: 'rt_',
+      table: 'jwt_refresh_tokens',
+      type: 'jwt_refresh_token',
+      tokenSecretLength: 40,
+    })
+  }
+
+  const guard = new JwtGuard(ctx, userProvider, {
+    secret: 'thisisasecret',
+    refreshTokenUserProvider: tokensUserProvider({
+      tokens: 'refreshTokens',
+      async model() {
+        return { default: User }
+      },
+    }),
+  })
+
+  const user = await User.create({
+    email: 'revoke_implicit@example.com',
+    username: 'revoke_implicit',
+    password: 'password',
+  })
+  const refreshToken = await User.refreshTokens.create(user)
+
+  // Put token in body
+  ctx.request.setInitialBody({ refreshToken: refreshToken.value!.release() })
+
+  // Revoke without passing token
+  await guard.revoke()
+
+  // Verify token is gone from DB
+  const dbToken = await User.refreshTokens.verify(refreshToken.value!)
+  assert.isNull(dbToken)
+})

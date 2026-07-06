@@ -740,6 +740,26 @@ test.group('Jwt guard | authenticate', () => {
     assert.isFalse(guard.isAuthenticated)
     assert.isTrue(guard.authenticationAttempted)
   })
+
+  test('it should return a token when user is authenticated with lowercase bearer header', async ({
+    assert,
+  }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const user = await userProvider.findById(1)
+    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret')
+
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    ctx.request.request.headers.authorization = `bearer ${token}`
+
+    const authenticatedUser = await guard.authenticate()
+
+    assert.isTrue(guard.isAuthenticated)
+    assert.isTrue(guard.authenticationAttempted)
+
+    assert.equal(guard.user, authenticatedUser)
+    assert.deepEqual(guard.getUserOrFail(), authenticatedUser)
+  })
 })
 
 test.group('Jwt guard | check', () => {
