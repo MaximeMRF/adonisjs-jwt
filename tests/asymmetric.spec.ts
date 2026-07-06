@@ -111,3 +111,99 @@ test.group('Jwt guard | asymmetric (ECDSA)', () => {
     assert.equal(guard.user!.id, 1)
   })
 })
+
+test.group('Jwt guard | validation and error cases', () => {
+  test('cannot use jwks together with asymmetric keys', async ({ assert }) => {
+    const { publicKey, privateKey } = rsaPemPair()
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, userProvider, {
+          privateKey,
+          publicKey,
+          algorithm: 'RS256',
+          jwks: {
+            jwksUri: 'http://localhost/jwks',
+          },
+        }),
+      'JwtGuard cannot use `jwks` together with asymmetric `privateKey` / `publicKey`'
+    )
+  })
+
+  test('requires secret or asymmetric keys or jwks', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    assert.throws(
+      () => new JwtGuard(ctx, userProvider, {} as any),
+      'JwtGuard requires `secret` (symmetric), or `privateKey` + `publicKey` + `algorithm` (asymmetric), or `jwks`'
+    )
+  })
+
+  test('unsupported asymmetric algorithm', async ({ assert }) => {
+    const { publicKey, privateKey } = rsaPemPair()
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, userProvider, {
+          privateKey,
+          publicKey,
+          algorithm: 'HS256' as any,
+        }),
+      'Unsupported asymmetric algorithm "HS256"'
+    )
+  })
+
+  test('privateKey type does not match algorithm', async ({ assert }) => {
+    const rsaKeys = rsaPemPair()
+    const ecKeys = ecPemPair()
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, userProvider, {
+          privateKey: ecKeys.privateKey,
+          publicKey: rsaKeys.publicKey,
+          algorithm: 'RS256',
+        }),
+      /privateKey type "ec" does not match algorithm "RS256"/
+    )
+  })
+
+  test('publicKey type does not match algorithm', async ({ assert }) => {
+    const rsaKeys = rsaPemPair()
+    const ecKeys = ecPemPair()
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, userProvider, {
+          privateKey: rsaKeys.privateKey,
+          publicKey: ecKeys.publicKey,
+          algorithm: 'RS256',
+        }),
+      /publicKey type "ec" does not match algorithm "RS256"/
+    )
+  })
+
+  test('invalid key structure fails validation', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, userProvider, {
+          privateKey: 'invalid-private-key',
+          publicKey: 'invalid-public-key',
+          algorithm: 'RS256',
+        }),
+      /JwtGuard asymmetric key validation failed/
+    )
+  })
+})
