@@ -79,7 +79,7 @@ export async function createDatabase() {
   )
 
   test.cleanup(async () => {
-    db.manager.closeAll()
+    await db.manager.closeAll()
     await rm(basePath, { force: true, recursive: true, maxRetries: 3 })
   })
   BaseModel.useAdapter(db.modelAdapter())
