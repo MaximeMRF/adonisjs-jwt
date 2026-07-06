@@ -69,7 +69,9 @@ export class JwtGuard<
       )
     }
 
-    if (this.#options.jwks) {
+    if (this.#options.driver) {
+      this.#driver = this.#options.driver
+    } else if (this.#options.jwks) {
       this.#driver = new JwksDriver(this.#options.jwks)
     } else if (usesAsymmetric) {
       this.#driver = new AsymmetricDriver({
@@ -207,9 +209,12 @@ export class JwtGuard<
       }
 
       /**
-       * Split the header value and read the token from it
+       * Read the token from the header case-insensitively
        */
-      ;[, token] = authHeader!.split('Bearer ')
+      if (authHeader.toLowerCase().startsWith('bearer ')) {
+        token = authHeader.slice(7).trim()
+      }
+
       if (!token) {
         throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
           guardDriverName: this.driverName,
