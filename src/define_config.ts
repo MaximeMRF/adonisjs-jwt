@@ -15,56 +15,7 @@ import { SymmetricDriver } from './drivers/symmetric.js'
 import { AsymmetricDriver } from './drivers/asymmetric.js'
 import { JwksDriver } from './drivers/jwks.js'
 import type { JwtDriver } from './drivers/types.js'
-
-function validateAsymmetricConfig(config: {
-  privateKey?: string
-  publicKey?: string
-  algorithm?: JwtAsymmetricAlgorithm
-  jwks?: Options
-}) {
-  const partial =
-    config.privateKey !== undefined ||
-    config.publicKey !== undefined ||
-    config.algorithm !== undefined
-
-  if (!partial) {
-    return
-  }
-
-  const usesAsymmetric =
-    config.privateKey !== undefined &&
-    config.publicKey !== undefined &&
-    config.algorithm !== undefined
-
-  if (partial && !usesAsymmetric) {
-    throw new Error(
-      'JWT guard asymmetric mode requires `privateKey`, `publicKey`, and `algorithm` to be set together'
-    )
-  }
-
-  if (config.jwks && usesAsymmetric) {
-    throw new Error(
-      'JWT guard cannot use `jwks` together with asymmetric `privateKey` / `publicKey`'
-    )
-  }
-
-  if (usesAsymmetric) {
-    try {
-      new AsymmetricDriver({
-        privateKey: config.privateKey!,
-        publicKey: config.publicKey!,
-        algorithm: config.algorithm!,
-      })
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Invalid asymmetric key configuration'
-      const cleanMessage = message.includes('JwtGuard asymmetric key validation failed: ')
-        ? message.replace('JwtGuard asymmetric key validation failed: ', '')
-        : message
-      throw new Error(`JWT guard asymmetric key validation failed: ${cleanMessage}`)
-    }
-  }
-}
+import { validateGuardOptions } from './validation.js'
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
@@ -85,13 +36,27 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {
-      validateAsymmetricConfig(config)
+      validateGuardOptions(config, 'JWT guard')
 
       const appKey = (app.config.get('app.appKey') as Secret<string>).release()
       const usesAsymmetric =
         config.privateKey !== undefined &&
         config.publicKey !== undefined &&
         config.algorithm !== undefined
+
+      if (usesAsymmetric) {
+        try {
+          new AsymmetricDriver({
+            privateKey: config.privateKey!,
+            publicKey: config.publicKey!,
+            algorithm: config.algorithm!,
+          })
+        } catch (error) {
+          throw new Error(
+            `JWT guard asymmetric key validation failed: ${error instanceof Error ? error.message : error}`
+          )
+        }
+      }
 
       let driver: JwtDriver
       if (config.jwks) {

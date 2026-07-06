@@ -9,6 +9,7 @@ import { SymmetricDriver } from './drivers/symmetric.js'
 import { AsymmetricDriver } from './drivers/asymmetric.js'
 import { JwksDriver } from './drivers/jwks.js'
 import type { JwtDriver } from './drivers/types.js'
+import { validateGuardOptions } from './validation.js'
 
 export class JwtGuard<
   UserProvider extends JwtUserProviderContract<unknown>,
@@ -41,44 +42,29 @@ export class JwtGuard<
       ...this.#options.cookie,
     }
 
-    const asymmetricPartial =
-      this.#options.privateKey !== undefined ||
-      this.#options.publicKey !== undefined ||
-      this.#options.algorithm !== undefined
+    validateGuardOptions(this.#options, 'JwtGuard')
 
     const usesAsymmetric =
       this.#options.privateKey !== undefined &&
       this.#options.publicKey !== undefined &&
       this.#options.algorithm !== undefined
 
-    if (asymmetricPartial && !usesAsymmetric) {
-      throw new Error(
-        'JwtGuard asymmetric mode requires `privateKey`, `publicKey`, and `algorithm` to be set together'
-      )
-    }
-
-    if (this.#options.jwks && usesAsymmetric) {
-      throw new Error(
-        'JwtGuard cannot use `jwks` together with asymmetric `privateKey` / `publicKey`'
-      )
-    }
-
-    if (!this.#options.driver && !this.#options.jwks && !usesAsymmetric && !this.#options.secret) {
-      throw new Error(
-        'JwtGuard requires `secret` (symmetric), or `privateKey` + `publicKey` + `algorithm` (asymmetric), or `jwks`'
-      )
-    }
-
     if (this.#options.driver) {
       this.#driver = this.#options.driver
     } else if (this.#options.jwks) {
       this.#driver = new JwksDriver(this.#options.jwks)
     } else if (usesAsymmetric) {
-      this.#driver = new AsymmetricDriver({
-        privateKey: this.#options.privateKey!,
-        publicKey: this.#options.publicKey!,
-        algorithm: this.#options.algorithm!,
-      })
+      try {
+        this.#driver = new AsymmetricDriver({
+          privateKey: this.#options.privateKey!,
+          publicKey: this.#options.publicKey!,
+          algorithm: this.#options.algorithm!,
+        })
+      } catch (error) {
+        throw new Error(
+          `JwtGuard asymmetric key validation failed: ${error instanceof Error ? error.message : error}`
+        )
+      }
     } else {
       this.#driver = new SymmetricDriver({
         secret: this.#options.secret!,
@@ -92,6 +78,20 @@ export class JwtGuard<
 
   async #verifyAccessToken(token: string) {
     return this.#driver.verify(token)
+  }
+
+  #extractToken(): string | undefined {
+    const cookieToken = this.#ctx.request.cookie(this.#tokenName)
+    if (cookieToken) {
+      return cookieToken
+    }
+
+    const authHeader = this.#ctx.request.header('authorization')
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      return authHeader.slice(7).trim()
+    }
+
+    return undefined
   }
   /**
    * A list of events and their types emitted by
@@ -192,34 +192,11 @@ export class JwtGuard<
     /**
      * Try to read the token from the cookies.
      */
-    let token = this.#ctx.request.cookie(`${this.#tokenName}`)
-
-    /**
-     * If token is missing on cookies, then try to read it from the header authorization
-     */
+    const token = this.#extractToken()
     if (!token) {
-      /**
-       * Ensure the auth header exists
-       */
-      const authHeader = this.#ctx.request.header('authorization')
-      if (!authHeader) {
-        throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-          guardDriverName: this.driverName,
-        })
-      }
-
-      /**
-       * Read the token from the header case-insensitively
-       */
-      if (authHeader.toLowerCase().startsWith('bearer ')) {
-        token = authHeader.slice(7).trim()
-      }
-
-      if (!token) {
-        throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-          guardDriverName: this.driverName,
-        })
-      }
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
     }
 
     /**

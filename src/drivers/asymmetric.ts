@@ -33,25 +33,19 @@ export class AsymmetricDriver implements JwtDriver {
       throw new Error(`Unsupported asymmetric algorithm "${algorithm}"`)
     }
 
-    try {
-      const privateKey = createPrivateKey(this.#privateKey)
-      const publicKey = createPublicKey(this.#publicKey)
+    const privateKey = createPrivateKey(this.#privateKey)
+    const publicKey = createPublicKey(this.#publicKey)
 
-      if (privateKey.asymmetricKeyType !== expectedKeyType) {
-        throw new Error(
-          `privateKey type "${privateKey.asymmetricKeyType}" does not match algorithm "${algorithm}"`
-        )
-      }
+    if (privateKey.asymmetricKeyType !== expectedKeyType) {
+      throw new Error(
+        `privateKey type "${privateKey.asymmetricKeyType}" does not match algorithm "${algorithm}"`
+      )
+    }
 
-      if (publicKey.asymmetricKeyType !== expectedKeyType) {
-        throw new Error(
-          `publicKey type "${publicKey.asymmetricKeyType}" does not match algorithm "${algorithm}"`
-        )
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Invalid asymmetric key configuration'
-      throw new Error(`JwtGuard asymmetric key validation failed: ${message}`)
+    if (publicKey.asymmetricKeyType !== expectedKeyType) {
+      throw new Error(
+        `publicKey type "${publicKey.asymmetricKeyType}" does not match algorithm "${algorithm}"`
+      )
     }
   }
 
