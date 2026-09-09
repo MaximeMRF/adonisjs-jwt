@@ -212,7 +212,12 @@ export class JwtGuard<
       })
     }
 
-    if (!payload || typeof payload !== 'object' || !('userId' in payload)) {
+    if (
+      !payload ||
+      typeof payload !== 'object' ||
+      (payload as Record<string, any>).userId === undefined ||
+      (payload as Record<string, any>).userId === null
+    ) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })

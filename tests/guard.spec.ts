@@ -514,6 +514,22 @@ test.group('Jwt guard | authenticate', () => {
     assert.isTrue(guard.authenticationAttempted)
   })
 
+  test('throw error when the userId in payload is null or undefined', async ({ assert }) => {
+    const userProvider = new JwtFakeUserProvider()
+    const ctx = new HttpContextFactory().create()
+    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+
+    const tokenNull = jwt.sign({ userId: null }, 'thisisasecret')
+    ctx.request.request.headers.authorization = `Bearer ${tokenNull}`
+    const [resultNull] = await Promise.allSettled([guard.authenticate()])
+    assert.equal(resultNull!.status, 'rejected')
+
+    const tokenUndefined = jwt.sign({ userId: undefined }, 'thisisasecret')
+    ctx.request.request.headers.authorization = `Bearer ${tokenUndefined}`
+    const [resultUndefined] = await Promise.allSettled([guard.authenticate()])
+    assert.equal(resultUndefined!.status, 'rejected')
+  })
+
   test('throw error when the payload is not an object', async ({ assert }) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
