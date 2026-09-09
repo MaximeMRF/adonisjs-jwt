@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import type { StringValue } from 'ms'
 import type { JwtDriver } from './types.js'
+import { ALLOWED_SYMMETRIC_ALGORITHMS } from '../types.js'
 
 export class SymmetricDriver implements JwtDriver {
   readonly canSign = true
@@ -19,6 +20,8 @@ export class SymmetricDriver implements JwtDriver {
   }
 
   verify(token: string): Record<string, any> | string {
-    return jwt.verify(token, this.#secret)
+    return jwt.verify(token, this.#secret, {
+      algorithms: [...ALLOWED_SYMMETRIC_ALGORITHMS],
+    })
   }
 }

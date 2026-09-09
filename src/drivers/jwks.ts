@@ -4,6 +4,7 @@ import type { Options } from 'jwks-rsa'
 import type { StringValue } from 'ms'
 import { JwksManager } from '../jwks.js'
 import type { JwtDriver } from './types.js'
+import { ALLOWED_JWKS_ALGORITHMS } from '../types.js'
 
 export class JwksDriver implements JwtDriver {
   readonly canSign = false
@@ -21,12 +22,14 @@ export class JwksDriver implements JwtDriver {
 
   async verify(token: string): Promise<Record<string, any> | string> {
     const decoded = jwt.decode(token, { complete: true })
-    if (!decoded || !decoded.header || !decoded.header.kid) {
+    if (!decoded || !decoded.header || !decoded.header.kid || !decoded.header.alg) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: 'jwt',
       })
     }
     const key = await this.#jwksManager.getSigningKey(decoded.header.kid)
-    return jwt.verify(token, key)
+    return jwt.verify(token, key, {
+      algorithms: [...ALLOWED_JWKS_ALGORITHMS],
+    })
   }
 }

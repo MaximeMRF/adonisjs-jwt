@@ -50,11 +50,32 @@ export type BaseJwtContent = {
   userId: string | number | BigInt
 }
 
+export const ALLOWED_SYMMETRIC_ALGORITHMS = ['HS256', 'HS384', 'HS512'] as const
+export type JwtSymmetricAlgorithm = (typeof ALLOWED_SYMMETRIC_ALGORITHMS)[number]
+
+export const ALLOWED_ASYMMETRIC_ALGORITHMS = [
+  'RS256',
+  'RS384',
+  'RS512',
+  'ES256',
+  'ES384',
+  'ES512',
+] as const
+
 /**
  * Algorithms supported for asymmetric (RSA / ECDSA) JWT signing and verification.
  * Use with `privateKey` + `publicKey` so access tokens can be verified elsewhere with only the public key.
  */
-export type JwtAsymmetricAlgorithm = 'RS256' | 'RS384' | 'RS512' | 'ES256' | 'ES384' | 'ES512'
+export type JwtAsymmetricAlgorithm = (typeof ALLOWED_ASYMMETRIC_ALGORITHMS)[number]
+
+export const ALLOWED_JWKS_ALGORITHMS = [
+  ...ALLOWED_ASYMMETRIC_ALGORITHMS,
+  'PS256',
+  'PS384',
+  'PS512',
+] as const
+
+export type JwtJwksAlgorithm = (typeof ALLOWED_JWKS_ALGORITHMS)[number]
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
   driver?: JwtDriver

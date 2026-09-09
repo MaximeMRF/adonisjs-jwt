@@ -177,4 +177,59 @@ test.group('Jwt guard | JWKS', (group) => {
     assert.exists(client)
     assert.property(client, 'getSigningKey')
   })
+
+  test('fail when token uses algorithm confusion (HS256 with RSA public key)', async ({
+    assert,
+  }) => {
+    const { publicKey, jwk, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+    nock('https://fake-auth.com')
+      .get('/.well-known/jwks.json')
+      .reply(200, { keys: [jwk] })
+
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+    })
+
+    // Sign with HS256 using the public key string as secret key (Algorithm Confusion Attack)
+    const forgedToken = jwt.sign({ userId: 1 }, publicKey, {
+      algorithm: 'HS256',
+      header: { kid, alg: 'HS256' },
+    })
+
+    ctx.request.request.headers.authorization = `Bearer ${forgedToken}`
+
+    await assert.rejects(async () => {
+      await guard.authenticate()
+    })
+  })
+
+  test('fail when token has no alg header', async ({ assert }) => {
+    const { privateKey, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+    })
+
+    // Construct a token with a header that omits the 'alg' property entirely
+    const header = Buffer.from(JSON.stringify({ kid })).toString('base64url')
+    const payload = Buffer.from(JSON.stringify({ userId: 1 })).toString('base64url')
+    const token = `${header}.${payload}.dummysignature`
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+
+    await assert.rejects(async () => {
+      await guard.authenticate()
+    })
+  })
 })
