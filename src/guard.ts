@@ -36,6 +36,7 @@ export class JwtGuard<
     this.#refreshTokenUserProvider = this.#options.refreshTokenUserProvider
     if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
     this.#tokenName = this.#options.tokenName ?? 'token'
+    this.#refreshTokenName = this.#options.refreshTokenName ?? 'refreshToken'
     this.#cookieOptions = {
       httpOnly: true,
       secure: true,

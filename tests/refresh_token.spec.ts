@@ -436,3 +436,63 @@ test('revoke should find and invalidate token from body/header when not passed e
   const dbToken = await User.refreshTokens.verify(refreshToken.value!)
   assert.isNull(dbToken)
 })
+
+test('generate should set and read custom refreshTokenName cookie when configured', async ({
+  assert,
+}) => {
+  const ctx = new HttpContextFactory().create()
+  const userProvider = new JwtFakeUserProvider()
+  const db = await createDatabase()
+  await createTables(db)
+
+  class User extends BaseModel {
+    @column({ isPrimary: true })
+    declare id: number
+    @column()
+    declare username: string
+    @column()
+    declare email: string
+    @column()
+    declare password: string
+    static refreshTokens = DbAccessTokensProvider.forModel(User, {
+      prefix: 'rt_',
+      table: 'jwt_refresh_tokens',
+      type: 'jwt_refresh_token',
+      tokenSecretLength: 40,
+    })
+  }
+
+  const guard = new JwtGuard(ctx, userProvider, {
+    secret: 'thisisasecret',
+    useCookies: true,
+    useCookiesForRefreshToken: true,
+    refreshTokenName: 'custom_refresh_token',
+    refreshTokenUserProvider: tokensUserProvider({
+      tokens: 'refreshTokens',
+      async model() {
+        return { default: User }
+      },
+    }),
+  })
+
+  const user = await User.create({
+    email: 'custom_rt@example.com',
+    username: 'custom_rt',
+    password: 'password',
+  })
+
+  const tokens: any = await guard.generate(user)
+  assert.exists(tokens.refreshToken)
+
+  const setCookie = ctx.response.getHeader('set-cookie') as string[]
+  assert.isArray(setCookie)
+  assert.isTrue(setCookie.some((c) => c.includes('custom_refresh_token=')))
+
+  ctx.request.cookie = function (key) {
+    if (key === 'custom_refresh_token') return tokens.refreshToken
+    return null
+  }
+
+  const refreshedTokens = await guard.generateWithRefreshToken()
+  assert.exists(refreshedTokens)
+})

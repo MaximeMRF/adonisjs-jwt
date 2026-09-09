@@ -98,6 +98,7 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   jwks?: Options
   refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string
+  refreshTokenName?: string
   expiresIn?: number | StringValue
   refreshTokenExpiresIn?: number | StringValue
   useCookies?: boolean

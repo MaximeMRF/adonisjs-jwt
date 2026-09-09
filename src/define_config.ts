@@ -21,6 +21,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   provider: UserProvider
   refreshTokenUserProvider?: AccessTokensUserProviderContract<unknown>
   tokenName?: string
+  refreshTokenName?: string
   tokenExpiresIn?: number | StringValue
   refreshTokenExpiresIn?: number | StringValue
   useCookies?: boolean
@@ -30,7 +31,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   privateKey?: string
   publicKey?: string
   algorithm?: JwtAsymmetricAlgorithm
-  content: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
+  content?: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
   jwks?: Options
   cookie?: JwtCookieOptions
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
@@ -86,6 +87,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
             }),
         refreshTokenUserProvider: config.refreshTokenUserProvider,
         tokenName: config.tokenName,
+        refreshTokenName: config.refreshTokenName,
         expiresIn: config.tokenExpiresIn,
         refreshTokenExpiresIn: config.refreshTokenExpiresIn,
         useCookies: config.useCookies,
