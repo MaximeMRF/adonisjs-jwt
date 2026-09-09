@@ -210,7 +210,7 @@ test.group('Jwt guard | JWKS', (group) => {
   })
 
   test('fail when token has no alg header', async ({ assert }) => {
-    const { privateKey, kid } = generateKeys()
+    const { kid } = generateKeys()
     const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
 
     const ctx = new HttpContextFactory().create()

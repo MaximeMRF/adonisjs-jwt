@@ -76,4 +76,73 @@ test.group('JWT Drivers', () => {
     const authenticatedUser = await guard.authenticate()
     assert.equal(authenticatedUser.id, 1)
   })
+
+  test('jwtGuard config provider should work without specifying content', async ({ assert }) => {
+    const { jwtGuard } = await import('../src/define_config.js')
+    const userProvider = new JwtFakeUserProvider()
+
+    const provider = jwtGuard({
+      provider: userProvider,
+      secret: 'mysecret',
+    })
+
+    const fakeApp = {
+      config: {
+        get: () => ({ release: () => 'appkey' }),
+      },
+    } as any
+
+    const guardFactory = await provider.resolver('jwt', fakeApp)
+    const ctx = new HttpContextFactory().create()
+    const guard = guardFactory(ctx)
+
+    const user = await userProvider.findById(1)
+    const tokenResult = await guard.generate(user!.getOriginal())
+    assert.exists(tokenResult.token)
+  })
+
+  test('jwtGuard config provider should resolve asymmetric driver and jwks driver', async ({
+    assert,
+  }) => {
+    const { jwtGuard } = await import('../src/define_config.js')
+    const userProvider = new JwtFakeUserProvider()
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    })
+
+    const fakeApp = {
+      config: {
+        get: () => ({ release: () => 'appkey' }),
+      },
+    } as any
+
+    const asymProvider = jwtGuard({
+      provider: userProvider,
+      privateKey,
+      publicKey,
+      algorithm: 'RS256',
+    })
+    const asymFactory = await asymProvider.resolver('jwt', fakeApp)
+    assert.exists(asymFactory)
+
+    const jwksProvider = jwtGuard({
+      provider: userProvider,
+      jwks: { jwksUri: 'https://example.com' },
+    })
+    const jwksFactory = await jwksProvider.resolver('jwt', fakeApp)
+    assert.exists(jwksFactory)
+
+    await assert.rejects(
+      async () =>
+        await jwtGuard({
+          provider: userProvider,
+          privateKey: 'invalid',
+          publicKey: 'invalid',
+          algorithm: 'RS256',
+        }).resolver('jwt', fakeApp),
+      /JWT guard asymmetric key validation failed/
+    )
+  })
 })
