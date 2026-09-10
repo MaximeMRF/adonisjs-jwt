@@ -23,6 +23,15 @@ jobs:
       - name: Run typecheck
         run: npm run typecheck
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install
+        run: npm install
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+
   tests:
     runs-on: ${{ matrix.os }}
     strategy:
