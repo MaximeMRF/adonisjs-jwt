@@ -326,3 +326,22 @@ The guard can receive the refresh token from three sources: the request body (`r
 - **`Authorization` header** — pass the refresh token as `Bearer <token>` in the header. This is the standard approach for machine-to-machine or mobile clients.
 
 Body support is kept for backwards compatibility but may be removed or opt-in in a future major version.
+
+### Symmetric secret strength
+
+When using symmetric signing (HMAC), the `secret` must be **at least 32 characters** long. A shorter secret can be brute-forced offline once an attacker obtains a signed token.
+
+```
+// Too short — will throw at startup
+secret: 'mysecret'
+
+// Sufficient entropy
+secret: env.get('JWT_SECRET') // generate with: openssl rand -hex 32
+```
+
+Generate a strong secret with:
+
+```bash
+openssl rand -hex 32
+```
+

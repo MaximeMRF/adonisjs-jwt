@@ -11,6 +11,11 @@ export class SymmetricDriver implements JwtDriver {
     if (!options.secret) {
       throw new Error('Symmetric JWT driver requires a secret key')
     }
+    if (options.secret.length < 32) {
+      throw new Error(
+        'Symmetric JWT driver requires a secret of at least 32 characters to ensure sufficient entropy'
+      )
+    }
     this.#secret = options.secret
   }
 

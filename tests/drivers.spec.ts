@@ -6,6 +6,7 @@ import { JwtGuard } from '../src/guard.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import { generateKeyPairSync } from 'node:crypto'
+import { TEST_SECRET, SHORT_SECRET } from './helpers.js'
 
 test.group('JWT Drivers', () => {
   test('SymmetricDriver should throw error if secret is missing', ({ assert }) => {
@@ -15,8 +16,17 @@ test.group('JWT Drivers', () => {
     )
   })
 
+  test('SymmetricDriver should throw error if secret is shorter than 32 characters', ({
+    assert,
+  }) => {
+    assert.throws(
+      () => new SymmetricDriver({ secret: SHORT_SECRET }),
+      'Symmetric JWT driver requires a secret of at least 32 characters to ensure sufficient entropy'
+    )
+  })
+
   test('SymmetricDriver should sign and verify correctly', ({ assert }) => {
-    const driver = new SymmetricDriver({ secret: 'secret' })
+    const driver = new SymmetricDriver({ secret: 'this-is-a-secret-with-32-chars!!' })
     const payload = { userId: 1 }
     const token = driver.sign(payload)
     assert.exists(token)
@@ -83,7 +93,7 @@ test.group('JWT Drivers', () => {
 
     const provider = jwtGuard({
       provider: userProvider,
-      secret: 'mysecret',
+      secret: TEST_SECRET,
     })
 
     const fakeApp = {

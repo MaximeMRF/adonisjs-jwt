@@ -4,7 +4,7 @@ import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import { createDatabase, createTables } from './helpers.js'
+import { createDatabase, createTables, TEST_SECRET } from './helpers.js'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 
 test('generate should return refresh token when configured', async ({ assert }) => {
@@ -31,7 +31,7 @@ test('generate should return refresh token when configured', async ({ assert }) 
   }
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     refreshTokenUserProvider: tokensUserProvider({
       tokens: 'refreshTokens',
       async model() {
@@ -77,7 +77,7 @@ test('generate should set cookies when configured', async ({ assert }) => {
   }
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     useCookies: true,
     useCookiesForRefreshToken: true,
     refreshTokenUserProvider: tokensUserProvider({
@@ -130,7 +130,7 @@ test('revoke should invalidate refresh token', async ({ assert }) => {
   }
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     refreshTokenUserProvider: tokensUserProvider({
       tokens: 'refreshTokens',
       async model() {
@@ -180,7 +180,7 @@ test('findRefreshToken should find token in body', async ({ assert }) => {
   }
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     refreshTokenUserProvider: tokensUserProvider({
       tokens: 'refreshTokens',
       async model() {
@@ -228,7 +228,7 @@ test('generate should return correct expires in when configured', async ({ asser
   }
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     refreshTokenExpiresIn: '2h',
     refreshTokenUserProvider: tokensUserProvider({
       tokens: 'refreshTokens',
@@ -272,7 +272,7 @@ test('findRefreshToken should find token in cookie', async ({ assert }) => {
   }
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     useCookiesForRefreshToken: true,
     refreshTokenUserProvider: tokensUserProvider({
       tokens: 'refreshTokens',
@@ -305,7 +305,7 @@ test('revoke should throw error when provider is not defined', async ({ assert }
   const userProvider = new JwtFakeUserProvider()
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
   })
 
   await assert.rejects(async () => {
@@ -319,7 +319,7 @@ test('revoke should return silently when token not found', async ({ assert }) =>
 
   // Create guard with provider but don't provide any token in request
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     refreshTokenUserProvider: tokensUserProvider({
       tokens: 'refreshTokens',
       async model() {
@@ -364,7 +364,7 @@ test('generateWithRefreshToken should fail when invalidateToken fails', async ({
   })
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     refreshTokenUserProvider: tokenProvider,
   })
 
@@ -410,7 +410,7 @@ test('revoke should find and invalidate token from body/header when not passed e
   }
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     refreshTokenUserProvider: tokensUserProvider({
       tokens: 'refreshTokens',
       async model() {
@@ -463,7 +463,7 @@ test('generate should set and read custom refreshTokenName cookie when configure
   }
 
   const guard = new JwtGuard(ctx, userProvider, {
-    secret: 'thisisasecret',
+    secret: TEST_SECRET,
     useCookies: true,
     useCookiesForRefreshToken: true,
     refreshTokenName: 'custom_refresh_token',

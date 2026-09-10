@@ -1,4 +1,17 @@
 import timekeeper from 'timekeeper'
+
+/**
+ * Shared JWT secret used across the test suite.
+ * Must be at least 32 characters (enforced by SymmetricDriver).
+ */
+export const TEST_SECRET = 'thisisasecret-with-sufficient-len'
+
+/**
+ * A secret that is intentionally too short, used to test the minimum
+ * length validation of SymmetricDriver.
+ */
+export const SHORT_SECRET = 'tooshort'
+
 import { getActiveTest } from '@japa/runner'
 import { BaseModel } from '@adonisjs/lucid/orm'
 import { AppFactory } from '@adonisjs/core/factories/app'

@@ -5,10 +5,9 @@ import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { errors } from '@adonisjs/auth'
 import { type JwtAuthFakeUser, JwtFakeUserProvider } from '../factories/main.js'
 import jwt from 'jsonwebtoken'
-import { timeTravel } from '../tests/helpers.js'
+import { timeTravel, createDatabase, createTables, TEST_SECRET } from '../tests/helpers.js'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import { createDatabase, createTables } from '../tests/helpers.js'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
 
 test.group('Jwt guard | authenticate', () => {
@@ -22,7 +21,7 @@ test.group('Jwt guard | authenticate', () => {
     await createTables(db)
 
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
       refreshTokenUserProvider: tokensUserProvider({
         tokens: 'refreshTokens',
         async model() {
@@ -87,7 +86,7 @@ test.group('Jwt guard | authenticate', () => {
     const userProvider = new JwtFakeUserProvider()
 
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
     })
 
     const [result] = await Promise.allSettled([guard.generateWithRefreshToken()])
@@ -108,7 +107,7 @@ test.group('Jwt guard | authenticate', () => {
     await createTables(db)
 
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
       refreshTokenUserProvider: tokensUserProvider({
         tokens: 'refreshTokens',
         async model() {
@@ -158,7 +157,7 @@ test.group('Jwt guard | authenticate', () => {
     await createTables(db)
 
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
       refreshTokenUserProvider: tokensUserProvider({
         tokens: 'refreshTokens',
         async model() {
@@ -212,7 +211,7 @@ test.group('Jwt guard | authenticate', () => {
     await createTables(db)
 
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
       refreshTokenUserProvider: tokensUserProvider({
         tokens: 'refreshTokens',
         async model() {
@@ -273,7 +272,7 @@ test.group('Jwt guard | authenticate', () => {
     const db = await createDatabase()
     await createTables(db)
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
       refreshTokenUserProvider: tokensUserProvider({
         tokens: 'refreshTokens',
         async model() {
@@ -330,7 +329,7 @@ test.group('Jwt guard | authenticate', () => {
     const db = await createDatabase()
     await createTables(db)
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
       refreshTokenUserProvider: tokensUserProvider({
         tokens: 'refreshTokens',
         async model() {
@@ -378,8 +377,8 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
-    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 1 }, 'thisisasecret')}`
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 1 }, TEST_SECRET)}`
 
     const authenticatedUser = await guard.authenticate()
 
@@ -394,8 +393,11 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret', useCookies: true })
-    const token = jwt.sign({ userId: 1 }, 'thisisasecret')
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      useCookies: true,
+    })
+    const token = jwt.sign({ userId: 1 }, TEST_SECRET)
     ctx.request.cookiesList().token = token
 
     ctx.request.cookie = (key: string) => {
@@ -419,11 +421,11 @@ test.group('Jwt guard | authenticate', () => {
     const userProvider = new JwtFakeUserProvider()
 
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
       useCookies: true,
       tokenName: 'custom',
     })
-    const token = jwt.sign({ userId: 1 }, 'thisisasecret')
+    const token = jwt.sign({ userId: 1 }, TEST_SECRET)
     ctx.request.cookiesList().custom = token
 
     ctx.request.cookie = (key: string) => {
@@ -445,7 +447,7 @@ test.group('Jwt guard | authenticate', () => {
   }) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
-    const mySecret = 'customsecret'
+    const mySecret = 'customsecret-that-is-long-enough!!'
 
     const guard = new JwtGuard(ctx, userProvider, {
       secret: mySecret,
@@ -474,7 +476,7 @@ test.group('Jwt guard | authenticate', () => {
       otherProperty: 'random',
     })
     const guard = new JwtGuard(ctx, userProvider, {
-      secret: 'thisisasecret',
+      secret: TEST_SECRET,
       expiresIn: '1h',
       content: jwtContentFn,
     })
@@ -484,7 +486,7 @@ test.group('Jwt guard | authenticate', () => {
     const tokenResponse: any = await guard.generate(user!.getOriginal())
     let decoded: any = {}
 
-    if ('token' in tokenResponse) decoded = jwt.verify(tokenResponse.token, 'thisisasecret')
+    if ('token' in tokenResponse) decoded = jwt.verify(tokenResponse.token, TEST_SECRET)
     else assert.fail('Token response is not an object when useCookies is false')
 
     assert.equal(tokenResponse.type, 'bearer')
@@ -498,8 +500,8 @@ test.group('Jwt guard | authenticate', () => {
   test('throw error when the userId is not found in the payload', async ({ assert }) => {
     const userProvider = new JwtFakeUserProvider()
     const ctx = new HttpContextFactory().create()
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
-    const token = jwt.sign({ foo: 'bar' }, 'thisisasecret')
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
+    const token = jwt.sign({ foo: 'bar' }, TEST_SECRET)
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
     const [result] = await Promise.allSettled([guard.authenticate()])
@@ -517,14 +519,14 @@ test.group('Jwt guard | authenticate', () => {
   test('throw error when the userId in payload is null or undefined', async ({ assert }) => {
     const userProvider = new JwtFakeUserProvider()
     const ctx = new HttpContextFactory().create()
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
 
-    const tokenNull = jwt.sign({ userId: null }, 'thisisasecret')
+    const tokenNull = jwt.sign({ userId: null }, TEST_SECRET)
     ctx.request.request.headers.authorization = `Bearer ${tokenNull}`
     const [resultNull] = await Promise.allSettled([guard.authenticate()])
     assert.equal(resultNull!.status, 'rejected')
 
-    const tokenUndefined = jwt.sign({ userId: undefined }, 'thisisasecret')
+    const tokenUndefined = jwt.sign({ userId: undefined }, TEST_SECRET)
     ctx.request.request.headers.authorization = `Bearer ${tokenUndefined}`
     const [resultUndefined] = await Promise.allSettled([guard.authenticate()])
     assert.equal(resultUndefined!.status, 'rejected')
@@ -534,8 +536,8 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
-    ctx.request.request.headers.authorization = `Bearer ${jwt.sign('foo', 'thisisasecret')}`
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign('foo', TEST_SECRET)}`
     const [result] = await Promise.allSettled([guard.authenticate()])
 
     assert.equal(result!.status, 'rejected')
@@ -553,8 +555,8 @@ test.group('Jwt guard | authenticate', () => {
   test('throw error when the payload contains a userId that does not exist', async ({ assert }) => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
-    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 999 }, 'thisisasecret')}`
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 999 }, TEST_SECRET)}`
     const [result] = await Promise.allSettled([guard.authenticate()])
 
     assert.equal(result!.status, 'rejected')
@@ -573,7 +575,7 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     ctx.request.request.headers.cookie = 'foo bar'
     const [result] = await Promise.allSettled([guard.authenticate()])
 
@@ -593,7 +595,7 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     ctx.request.request.headers.cookie = 'token='
     const [result] = await Promise.allSettled([guard.authenticate()])
 
@@ -613,13 +615,13 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
     const user = await userProvider.findById(1)
-    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret', {
+    const token = await userProvider.createToken(user!.getOriginal(), TEST_SECRET, {
       expiresIn: '1h',
     })
 
     timeTravel(61 * 60)
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     ctx.request.request.headers.cookie = `token=${token}`
     const [result] = await Promise.allSettled([guard.authenticate()])
 
@@ -640,7 +642,7 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     const [result] = await Promise.allSettled([guard.authenticate()])
 
     assert.equal(result!.status, 'rejected')
@@ -659,7 +661,7 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     ctx.request.request.headers.authorization = 'foo bar'
     const [result] = await Promise.allSettled([guard.authenticate()])
 
@@ -679,7 +681,7 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     ctx.request.request.headers.authorization = 'Bearer '
     const [result] = await Promise.allSettled([guard.authenticate()])
 
@@ -699,7 +701,7 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     ctx.request.request.headers.authorization = 'Bearer coucou'
     const [result] = await Promise.allSettled([guard.authenticate()])
 
@@ -719,13 +721,13 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
     const user = await userProvider.findById(1)
-    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret', {
+    const token = await userProvider.createToken(user!.getOriginal(), TEST_SECRET, {
       expiresIn: '1h',
     })
 
     timeTravel(61 * 60)
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     ctx.request.request.headers.authorization = `Bearer ${token}`
     const [result] = await Promise.allSettled([guard.authenticate()])
 
@@ -744,9 +746,9 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
     const user = await userProvider.findById(1)
-    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret')
+    const token = await userProvider.createToken(user!.getOriginal(), TEST_SECRET)
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     await assert.rejects(() => guard.authenticate(), 'Unauthorized access')
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
@@ -763,9 +765,9 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
     const user = await userProvider.findById(1)
-    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret')
+    const token = await userProvider.createToken(user!.getOriginal(), TEST_SECRET)
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     ctx.request.request.headers.authorization = `bearer ${token}`
 
     const authenticatedUser = await guard.authenticate()
@@ -784,10 +786,10 @@ test.group('Jwt guard | check', () => {
     const userProvider = new JwtFakeUserProvider()
 
     const user = await userProvider.findById(1)
-    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret', {
+    const token = await userProvider.createToken(user!.getOriginal(), TEST_SECRET, {
       expiresIn: '1h',
     })
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
     const isLoggedIn = await guard.check()
@@ -808,10 +810,10 @@ test.group('Jwt guard | check', () => {
     const userProvider = new JwtFakeUserProvider()
 
     const user = await userProvider.findById(1)
-    const token = await userProvider.createToken(user!.getOriginal(), 'thisisasecret', {
+    const token = await userProvider.createToken(user!.getOriginal(), TEST_SECRET, {
       expiresIn: '1h',
     })
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
 
     timeTravel(61 * 60)
 
@@ -830,7 +832,7 @@ test.group('Jwt tokens guard | authenticateAsClient', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret' })
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
     const user = await userProvider.findById(1)
     const response = await guard.authenticateAsClient(user!.getOriginal())
 
@@ -845,7 +847,10 @@ test.group('Jwt tokens guard | authenticateAsClient', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: 'thisisasecret', useCookies: true })
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      useCookies: true,
+    })
     const user = await userProvider.findById(1)
     const response = await guard.authenticateAsClient(user!.getOriginal())
 
