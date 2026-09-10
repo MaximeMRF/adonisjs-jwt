@@ -296,9 +296,9 @@ router.post('jwt/refresh', async ({ auth }) => {
   // this will authenticate the user using the refresh token
   // it will delete the old refresh token and generate a new one
   // it accepts an optional refresh token, otherwise it looks in:
-  // 1. request body 'refreshToken'
-  // 2. cookies (if enabled)
-  // 3. Authorization header
+  // 1. request body 'refreshToken'  ⚠️ discouraged, see Security section
+  // 2. cookies (if useCookiesForRefreshToken is enabled) ✅ recommended
+  // 3. Authorization header                              ✅ recommended
   return await auth.use('jwt').generateWithRefreshToken()
 })
 
@@ -312,3 +312,17 @@ router.post('logout', async ({ auth }) => {
 ## Security
 
 We use natively the AdonisJS application key to sign the token, so you don't have to worry about it and [avoid this](https://trufflesecurity.com/blog/stop-recommending-jwts).
+
+### Refresh token transport
+
+The guard can receive the refresh token from three sources: the request body (`refreshToken` field), an `HttpOnly` cookie, or the `Authorization: Bearer` header.
+
+> [!WARNING]
+> **Sending the refresh token in the request body is discouraged.** Body content is frequently captured by server-side logging middleware, which means your refresh tokens could appear in plain text in your logs. It may also be harder to apply strict CORS/CSRF policies on body parameters.
+
+**Recommended approaches:**
+
+- **Cookies** (`useCookiesForRefreshToken: true`) — the token is stored in an `HttpOnly` + `Secure` cookie, invisible to JavaScript and automatically scoped by `SameSite` policy.
+- **`Authorization` header** — pass the refresh token as `Bearer <token>` in the header. This is the standard approach for machine-to-machine or mobile clients.
+
+Body support is kept for backwards compatibility but may be removed or opt-in in a future major version.
