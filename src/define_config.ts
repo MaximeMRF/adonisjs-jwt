@@ -37,9 +37,16 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {
-      validateGuardOptions(config, 'JWT guard')
-
       const appKey = (app.config.get('app.appKey') as Secret<string>).release()
+      const resolvedSecret = config.secret ?? appKey
+
+      const resolvedConfig = {
+        ...config,
+        secret: resolvedSecret,
+      }
+
+      validateGuardOptions(resolvedConfig, 'JWT guard')
+
       const usesAsymmetric =
         config.privateKey !== undefined &&
         config.publicKey !== undefined &&
@@ -53,9 +60,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
             algorithm: config.algorithm!,
           })
         } catch (error) {
-          throw new Error(
-            `JWT guard asymmetric key validation failed: ${error instanceof Error ? error.message : error}`
-          )
+          throw new Error(`JWT guard asymmetric key validation failed: ${(error as Error).message}`)
         }
       }
 
@@ -70,7 +75,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
         })
       } else {
         driver = new SymmetricDriver({
-          secret: config.secret ?? appKey,
+          secret: resolvedSecret,
         })
       }
 
@@ -83,7 +88,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
               algorithm: config.algorithm,
             }
           : {
-              secret: config.secret ?? appKey,
+              secret: resolvedSecret,
             }),
         refreshTokenUserProvider: config.refreshTokenUserProvider,
         tokenName: config.tokenName,

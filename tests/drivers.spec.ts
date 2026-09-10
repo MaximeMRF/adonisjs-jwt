@@ -145,4 +145,29 @@ test.group('JWT Drivers', () => {
       /JWT guard asymmetric key validation failed/
     )
   })
+
+  test('jwtGuard config provider should fallback to appKey when secret is not provided', async ({
+    assert,
+  }) => {
+    const { jwtGuard } = await import('../src/define_config.js')
+    const userProvider = new JwtFakeUserProvider()
+
+    const provider = jwtGuard({
+      provider: userProvider,
+    })
+
+    const fakeApp = {
+      config: {
+        get: () => ({ release: () => 'fallback-app-key-12345678901234567890' }),
+      },
+    } as any
+
+    const guardFactory = await provider.resolver('jwt', fakeApp)
+    const ctx = new HttpContextFactory().create()
+    const guard = guardFactory(ctx)
+
+    const user = await userProvider.findById(1)
+    const tokenResult = await guard.generate(user!.getOriginal())
+    assert.exists(tokenResult.token)
+  })
 })

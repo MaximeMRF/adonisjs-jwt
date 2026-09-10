@@ -62,9 +62,7 @@ export class JwtGuard<
           algorithm: this.#options.algorithm!,
         })
       } catch (error) {
-        throw new Error(
-          `JwtGuard asymmetric key validation failed: ${error instanceof Error ? error.message : error}`
-        )
+        throw new Error(`JwtGuard asymmetric key validation failed: ${(error as Error).message}`)
       }
     } else {
       this.#driver = new SymmetricDriver({
