@@ -9,15 +9,21 @@ export class AsymmetricDriver implements JwtDriver {
   #privateKey: string
   #publicKey: string
   #algorithm: JwtAsymmetricAlgorithm
+  #issuer?: string
+  #audience?: string | string[]
 
   constructor(options: {
     privateKey: string
     publicKey: string
     algorithm: JwtAsymmetricAlgorithm
+    issuer?: string
+    audience?: string | string[]
   }) {
     this.#privateKey = options.privateKey
     this.#publicKey = options.publicKey
     this.#algorithm = options.algorithm
+    this.#issuer = options.issuer
+    this.#audience = options.audience
     this.#assertAsymmetricKeyMatchesAlgorithm()
   }
 
@@ -50,16 +56,21 @@ export class AsymmetricDriver implements JwtDriver {
   }
 
   sign(payload: Record<string, any>, options?: { expiresIn?: number | StringValue }): string {
-    const expires = options?.expiresIn ? { expiresIn: options.expiresIn } : {}
-    return jwt.sign(payload, this.#privateKey, {
-      ...expires,
+    const signOptions: jwt.SignOptions = {
+      ...(options?.expiresIn ? { expiresIn: options.expiresIn } : {}),
       algorithm: this.#algorithm,
-    })
+      ...(this.#issuer ? { issuer: this.#issuer } : {}),
+      ...(this.#audience ? { audience: this.#audience } : {}),
+    }
+    return jwt.sign(payload, this.#privateKey, signOptions)
   }
 
   verify(token: string): Record<string, any> | string {
-    return jwt.verify(token, this.#publicKey, {
+    const verifyOptions: jwt.VerifyOptions = {
       algorithms: [this.#algorithm],
-    })
+      ...(this.#issuer ? { issuer: this.#issuer } : {}),
+      ...(this.#audience ? { audience: this.#audience } : {}),
+    }
+    return jwt.verify(token, this.#publicKey, verifyOptions)
   }
 }

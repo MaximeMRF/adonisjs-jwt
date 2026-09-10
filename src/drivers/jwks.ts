@@ -9,9 +9,13 @@ import { ALLOWED_JWKS_ALGORITHMS } from '../types.js'
 export class JwksDriver implements JwtDriver {
   readonly canSign = false
   #jwksManager: JwksManager
+  #issuer?: string
+  #audience?: string | string[]
 
-  constructor(options: Options) {
+  constructor(options: Options, driverOptions?: { issuer?: string; audience?: string | string[] }) {
     this.#jwksManager = new JwksManager(options)
+    this.#issuer = driverOptions?.issuer
+    this.#audience = driverOptions?.audience
   }
 
   sign(_payload: Record<string, any>, _options?: { expiresIn?: number | StringValue }): never {
@@ -28,8 +32,11 @@ export class JwksDriver implements JwtDriver {
       })
     }
     const key = await this.#jwksManager.getSigningKey(decoded.header.kid)
-    return jwt.verify(token, key, {
+    const verifyOptions: jwt.VerifyOptions = {
       algorithms: [...ALLOWED_JWKS_ALGORITHMS],
-    })
+      ...(this.#issuer ? { issuer: this.#issuer } : {}),
+      ...(this.#audience ? { audience: this.#audience } : {}),
+    }
+    return jwt.verify(token, key, verifyOptions)
   }
 }

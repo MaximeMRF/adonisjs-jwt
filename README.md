@@ -103,6 +103,9 @@ const authConfig = defineConfig({
       },
       // limit the abilities of the refresh token
       refreshTokenAbilities: ['refresh_token'],
+      // optional issuer (iss) and audience (aud) claims for token verification
+      issuer: 'my-app',
+      audience: 'my-api',
       // content is a function that takes the user and returns the content of the token, it can be optional, by default it returns only the user id
       content: <T>(user: JwtGuardUser<T>): JwtContent => {
         return {
@@ -116,6 +119,7 @@ const authConfig = defineConfig({
 ```
 
 `tokenName` is the name of the jwt token passed as a cookie, it can be optional, by default it is `token`.
+`issuer` and `audience` allow validating the `iss` and `aud` claims on incoming tokens to prevent cross-service token misuse in multi-service architecture.
 
 ```typescript
 tokenName: 'custom-name'
@@ -344,4 +348,14 @@ Generate a strong secret with:
 ```bash
 openssl rand -hex 32
 ```
+
+### Access token revocation & Statelessness
+
+JWT access tokens are **stateless** — once issued, they are cryptographically validated without querying the database until their expiration time (`tokenExpiresIn`).
+
+Calling `auth.use('jwt').revoke()` invalidates the **refresh token** stored in the database, preventing attackers from generating *new* access tokens. However, any existing, unexpired access token will remain valid until `tokenExpiresIn` elapses.
+
+> [!TIP]
+> Keep `tokenExpiresIn` short (e.g. `15m` or `1h`) to limit the lifetime of issued access tokens, and rely on `generateWithRefreshToken()` to silently rotate tokens.
+
 

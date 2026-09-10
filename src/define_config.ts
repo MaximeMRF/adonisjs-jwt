@@ -34,6 +34,8 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   content?: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
   jwks?: Options
   cookie?: JwtCookieOptions
+  issuer?: string
+  audience?: string | string[]
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {
@@ -58,6 +60,8 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
             privateKey: config.privateKey!,
             publicKey: config.publicKey!,
             algorithm: config.algorithm!,
+            issuer: config.issuer,
+            audience: config.audience,
           })
         } catch (error) {
           throw new Error(`JWT guard asymmetric key validation failed: ${(error as Error).message}`)
@@ -66,16 +70,23 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
 
       let driver: JwtDriver
       if (config.jwks) {
-        driver = new JwksDriver(config.jwks)
+        driver = new JwksDriver(config.jwks, {
+          issuer: config.issuer,
+          audience: config.audience,
+        })
       } else if (usesAsymmetric) {
         driver = new AsymmetricDriver({
           privateKey: config.privateKey!,
           publicKey: config.publicKey!,
           algorithm: config.algorithm!,
+          issuer: config.issuer,
+          audience: config.audience,
         })
       } else {
         driver = new SymmetricDriver({
           secret: resolvedSecret,
+          issuer: config.issuer,
+          audience: config.audience,
         })
       }
 
@@ -101,6 +112,8 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
         content: config.content,
         jwks: config.jwks,
         cookie: config.cookie,
+        issuer: config.issuer,
+        audience: config.audience,
       }
       return (ctx) => new JwtGuard(ctx, config.provider, options)
     },

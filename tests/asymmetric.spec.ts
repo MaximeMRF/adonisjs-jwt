@@ -49,6 +49,29 @@ test.group('Jwt guard | asymmetric (RSA)', () => {
     assert.equal(guard.user!.id, 1)
   })
 
+  test('generate and authenticate with RS256 and issuer/audience', async ({ assert }) => {
+    const { publicKey, privateKey } = rsaPemPair()
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      privateKey,
+      publicKey,
+      algorithm: 'RS256',
+      issuer: 'asym-issuer',
+      audience: 'asym-audience',
+    })
+
+    const user = await userProvider.findById(1)
+    const { token } = await guard.generate(user!.getOriginal())
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    await guard.authenticate()
+
+    assert.isTrue(guard.isAuthenticated)
+    assert.equal(guard.user!.id, 1)
+  })
+
   test('rejects HS256 token when using asymmetric guard', async ({ assert }) => {
     const { publicKey, privateKey } = rsaPemPair()
     const ctx = new HttpContextFactory().create()

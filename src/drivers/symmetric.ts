@@ -6,8 +6,10 @@ import { ALLOWED_SYMMETRIC_ALGORITHMS } from '../types.js'
 export class SymmetricDriver implements JwtDriver {
   readonly canSign = true
   #secret: string
+  #issuer?: string
+  #audience?: string | string[]
 
-  constructor(options: { secret: string }) {
+  constructor(options: { secret: string; issuer?: string; audience?: string | string[] }) {
     if (!options.secret) {
       throw new Error('Symmetric JWT driver requires a secret key')
     }
@@ -17,16 +19,25 @@ export class SymmetricDriver implements JwtDriver {
       )
     }
     this.#secret = options.secret
+    this.#issuer = options.issuer
+    this.#audience = options.audience
   }
 
   sign(payload: Record<string, any>, options?: { expiresIn?: number | StringValue }): string {
-    const expires = options?.expiresIn ? { expiresIn: options.expiresIn } : {}
-    return jwt.sign(payload, this.#secret, expires)
+    const signOptions: jwt.SignOptions = {
+      ...(options?.expiresIn ? { expiresIn: options.expiresIn } : {}),
+      ...(this.#issuer ? { issuer: this.#issuer } : {}),
+      ...(this.#audience ? { audience: this.#audience } : {}),
+    }
+    return jwt.sign(payload, this.#secret, signOptions)
   }
 
   verify(token: string): Record<string, any> | string {
-    return jwt.verify(token, this.#secret, {
+    const verifyOptions: jwt.VerifyOptions = {
       algorithms: [...ALLOWED_SYMMETRIC_ALGORITHMS],
-    })
+      ...(this.#issuer ? { issuer: this.#issuer } : {}),
+      ...(this.#audience ? { audience: this.#audience } : {}),
+    }
+    return jwt.verify(token, this.#secret, verifyOptions)
   }
 }

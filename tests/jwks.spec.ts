@@ -57,6 +57,39 @@ test.group('Jwt guard | JWKS', (group) => {
     assert.isTrue(guard.isAuthenticated)
   })
 
+  test('authenticate using JWKS with issuer and audience', async ({ assert }) => {
+    const { privateKey, jwk, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+    nock('https://fake-auth.com')
+      .get('/.well-known/jwks.json')
+      .reply(200, { keys: [jwk] })
+
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+      issuer: 'jwks-issuer',
+      audience: 'jwks-audience',
+    })
+
+    const token = jwt.sign({ userId: 1 }, privateKey, {
+      algorithm: 'RS256',
+      keyid: kid,
+      header: { kid, alg: 'RS256' },
+      issuer: 'jwks-issuer',
+      audience: 'jwks-audience',
+    })
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+
+    const user = await guard.authenticate()
+    assert.equal(user.id, 1)
+    assert.isTrue(guard.isAuthenticated)
+  })
+
   test('fail when JWKS fetch fails', async ({ assert }) => {
     const { privateKey, kid } = generateKeys()
     const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'

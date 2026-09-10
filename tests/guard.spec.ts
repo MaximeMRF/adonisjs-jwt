@@ -862,3 +862,54 @@ test.group('Jwt tokens guard | authenticateAsClient', () => {
     )
   })
 })
+
+test.group('Jwt guard | issuer and audience validation', () => {
+  test('should sign and authenticate when issuer and audience match', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      issuer: 'my-auth-server',
+      audience: 'my-api',
+    })
+
+    const user = await userProvider.findById(1)
+    const { token } = await guard.generate(user!.getOriginal())
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    const authenticatedUser = await guard.authenticate()
+
+    assert.equal(authenticatedUser.id, 1)
+  })
+
+  test('should fail authentication when token issuer does not match', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      issuer: 'expected-issuer',
+    })
+
+    const invalidToken = jwt.sign({ userId: 1 }, TEST_SECRET, { issuer: 'wrong-issuer' })
+    ctx.request.request.headers.authorization = `Bearer ${invalidToken}`
+
+    await assert.rejects(async () => await guard.authenticate(), /Unauthorized access/)
+  })
+
+  test('should fail authentication when token audience does not match', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      audience: 'expected-audience',
+    })
+
+    const invalidToken = jwt.sign({ userId: 1 }, TEST_SECRET, { audience: 'wrong-audience' })
+    ctx.request.request.headers.authorization = `Bearer ${invalidToken}`
+
+    await assert.rejects(async () => await guard.authenticate(), /Unauthorized access/)
+  })
+})

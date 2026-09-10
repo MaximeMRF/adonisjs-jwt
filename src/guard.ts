@@ -53,13 +53,18 @@ export class JwtGuard<
     if (this.#options.driver) {
       this.#driver = this.#options.driver
     } else if (this.#options.jwks) {
-      this.#driver = new JwksDriver(this.#options.jwks)
+      this.#driver = new JwksDriver(this.#options.jwks, {
+        issuer: this.#options.issuer,
+        audience: this.#options.audience,
+      })
     } else if (usesAsymmetric) {
       try {
         this.#driver = new AsymmetricDriver({
           privateKey: this.#options.privateKey!,
           publicKey: this.#options.publicKey!,
           algorithm: this.#options.algorithm!,
+          issuer: this.#options.issuer,
+          audience: this.#options.audience,
         })
       } catch (error) {
         throw new Error(`JwtGuard asymmetric key validation failed: ${(error as Error).message}`)
@@ -67,6 +72,8 @@ export class JwtGuard<
     } else {
       this.#driver = new SymmetricDriver({
         secret: this.#options.secret!,
+        issuer: this.#options.issuer,
+        audience: this.#options.audience,
       })
     }
   }

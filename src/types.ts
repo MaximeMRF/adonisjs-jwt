@@ -106,4 +106,12 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   refreshTokenAbilities?: string[]
   cookie?: JwtCookieOptions
   content?: (user: JwtGuardUser<RealUser>) => Record<string, any>
+  /**
+   * Expected JWT issuer (iss). Validated during token verification.
+   */
+  issuer?: string
+  /**
+   * Expected JWT audience (aud). Validated during token verification.
+   */
+  audience?: string | string[]
 }
