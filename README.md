@@ -18,7 +18,7 @@
 | Package Version | AdonisJS Version  | Node.js Required |
 | --------------- | ----------------- | ---------------- |
 | `v0.7.x`        | `AdonisJS v6`     | `>= 20.6.0`      |
-| **`v0.8.x`**    | **`AdonisJS v7`** | **`>= 24.0.0`**  |
+| **`>= v0.8.x`**    | **`AdonisJS v7`** | **`>= 24.0.0`**  |
 
 ## Prerequisites
 
