@@ -7,11 +7,25 @@
 | command. You are free to perform any operations inside this function to
 | configure the package.
 |
-| To make things easier, you have access to the underlying "ConfigureCommand"
-| instance and you can use codemods to modify the source files.
-|
 */
 
 import type ConfigureCommand from '@adonisjs/core/commands/configure'
+import { stubsRoot } from './stubs/main.js'
 
-export async function configure(_command: ConfigureCommand) {}
+export async function configure(command: ConfigureCommand) {
+  const codemods = await command.createCodemods()
+
+  const createMigration = await command.prompt.confirm(
+    'Do you want to create the database migration for JWT refresh tokens?',
+    { default: true }
+  )
+
+  if (createMigration) {
+    const time = new Date().getTime()
+    await codemods.makeUsingStub(stubsRoot, 'migration.stub', {
+      entity: {
+        filename: `${time}_create_jwt_refresh_tokens_table.ts`,
+      },
+    })
+  }
+}

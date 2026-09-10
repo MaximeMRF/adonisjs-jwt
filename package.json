@@ -6,16 +6,21 @@
     "node": ">=20.6.0"
   },
   "type": "module",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
   "files": [
     "build/src",
     "build/stubs",
     "build/index.d.ts",
-    "build/index.js"
+    "build/index.js",
+    "build/configure.d.ts",
+    "build/configure.js"
   ],
   "exports": {
     ".": "./build/index.js",
     "./types": "./build/src/types.js",
-    "./jwt_config": "./build/src/define_config.js"
+    "./jwt_config": "./build/src/define_config.js",
+    "./stubs": "./build/stubs/main.js"
   },
   "imports": {
     "#generated/*": "./.adonisjs/server/*.js",
