@@ -261,25 +261,44 @@ jwt: jwtGuard({
   },
   // must match the `audiences` of the projected token mounted in the calling pods
   audience: 'my-api',
+  // default issuer on kubeadm-based clusters; managed clusters use their own URL (see below)
   issuer: 'https://kubernetes.default.svc.cluster.local',
   getUserId: (payload) => payload.sub,
 }),
 ```
 
+The issuer depends on your cluster: `https://kubernetes.default.svc.cluster.local` is the kubeadm default, while managed clusters use their own URL (e.g. `https://oidc.eks.<region>.amazonaws.com/id/<id>` on EKS, `https://container.googleapis.com/v1/projects/<project>/locations/<location>/clusters/<cluster>` on GKE). Check yours with:
+
+```bash
+kubectl get --raw /.well-known/openid-configuration
+```
+
+Legacy Secret-based ServiceAccount tokens (issuer `kubernetes/serviceaccount`, no expiration) are rejected by the `issuer` check.
+
 The calling pod mounts a projected token with that audience and sends it as a Bearer token:
 
 ```yaml
-volumes:
-  - name: api-token
-    projected:
-      sources:
-        - serviceAccountToken:
-            path: token
-            audience: my-api
-            expirationSeconds: 3600
+spec:
+  containers:
+    - name: my-client
+      volumeMounts:
+        - name: api-token
+          mountPath: /var/run/secrets/my-api
+          readOnly: true
+  volumes:
+    - name: api-token
+      projected:
+        sources:
+          - serviceAccountToken:
+              path: token
+              audience: my-api
+              expirationSeconds: 3600
 ```
 
-Check your cluster's issuer with `kubectl get --raw /.well-known/openid-configuration`.
+The kubelet rotates this token before it expires, so the client must re-read `/var/run/secrets/my-api/token` on each request (or at least regularly) instead of caching it at startup.
+
+> [!NOTE]
+> Tokens are verified offline against the JWKS, not through the Kubernetes `TokenReview` API. A token stays valid until its `exp` even if the pod it was issued for has been deleted (up to `expirationSeconds`, minimum 600). Keep `expirationSeconds` short, or call `TokenReview` from your user provider if you need immediate revocation.
 
 ## Refresh Tokens
 
