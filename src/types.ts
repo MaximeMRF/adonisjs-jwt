@@ -128,6 +128,10 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
    */
   algorithms?: JwtJwksAlgorithm[]
   /**
+   * Number of seconds of clock skew tolerated when checking `exp` / `nbf`.
+   */
+  clockTolerance?: number
+  /**
    * Extract the user id from a verified token payload.
    * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
    */

@@ -11,6 +11,7 @@ export class JwksDriver implements JwtDriver {
   #jwksManager: JwksManager
   #issuer?: string
   #audience?: string | string[]
+  #clockTolerance?: number
   #algorithms: JwtJwksAlgorithm[]
 
   constructor(
@@ -19,6 +20,7 @@ export class JwksDriver implements JwtDriver {
       issuer?: string
       audience?: string | string[]
       algorithms?: JwtJwksAlgorithm[]
+      clockTolerance?: number
     }
   ) {
     const algorithms = driverOptions?.algorithms ?? [...ALLOWED_JWKS_ALGORITHMS]
@@ -37,6 +39,7 @@ export class JwksDriver implements JwtDriver {
     this.#jwksManager = new JwksManager(options)
     this.#issuer = driverOptions?.issuer
     this.#audience = driverOptions?.audience
+    this.#clockTolerance = driverOptions?.clockTolerance
     this.#algorithms = algorithms
   }
 
@@ -58,6 +61,7 @@ export class JwksDriver implements JwtDriver {
       algorithms: [...this.#algorithms],
       ...(this.#issuer ? { issuer: this.#issuer } : {}),
       ...(this.#audience ? { audience: this.#audience as jwt.VerifyOptions['audience'] } : {}),
+      ...(this.#clockTolerance !== undefined ? { clockTolerance: this.#clockTolerance } : {}),
     }
     return jwt.verify(token, key, verifyOptions)
   }

@@ -16,6 +16,7 @@ export function resolveDriver(
     issuer?: string
     audience?: string | string[]
     algorithms?: JwtJwksAlgorithm[]
+    clockTolerance?: number
   },
   contextName = 'JWT guard'
 ): JwtDriver {
@@ -33,6 +34,7 @@ export function resolveDriver(
       return new JwksDriver(options.jwks, {
         issuer: options.issuer,
         audience: options.audience,
+        clockTolerance: options.clockTolerance,
         algorithms: options.algorithms,
       })
     } catch (error) {
@@ -48,6 +50,7 @@ export function resolveDriver(
         algorithm: options.algorithm!,
         issuer: options.issuer,
         audience: options.audience,
+        clockTolerance: options.clockTolerance,
       })
     } catch (error) {
       throw new Error(
@@ -60,5 +63,6 @@ export function resolveDriver(
     secret: options.secret!,
     issuer: options.issuer,
     audience: options.audience,
+    clockTolerance: options.clockTolerance,
   })
 }

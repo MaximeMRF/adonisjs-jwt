@@ -37,6 +37,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   issuer?: string
   audience?: string | string[]
   algorithms?: JwtJwksAlgorithm[]
+  clockTolerance?: number
   getUserId?: JwtGetUserId
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
@@ -83,6 +84,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
         issuer: config.issuer,
         audience: config.audience,
         algorithms: config.algorithms,
+        clockTolerance: config.clockTolerance,
         getUserId: config.getUserId,
       }
       return (ctx) => new JwtGuard(ctx, config.provider, options)

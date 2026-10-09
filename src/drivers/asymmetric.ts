@@ -11,6 +11,7 @@ export class AsymmetricDriver implements JwtDriver {
   #algorithm: JwtAsymmetricAlgorithm
   #issuer?: string
   #audience?: string | string[]
+  #clockTolerance?: number
 
   constructor(options: {
     privateKey: string
@@ -18,12 +19,14 @@ export class AsymmetricDriver implements JwtDriver {
     algorithm: JwtAsymmetricAlgorithm
     issuer?: string
     audience?: string | string[]
+    clockTolerance?: number
   }) {
     this.#privateKey = options.privateKey
     this.#publicKey = options.publicKey
     this.#algorithm = options.algorithm
     this.#issuer = options.issuer
     this.#audience = options.audience
+    this.#clockTolerance = options.clockTolerance
     this.#assertAsymmetricKeyMatchesAlgorithm()
   }
 
@@ -70,6 +73,7 @@ export class AsymmetricDriver implements JwtDriver {
       algorithms: [this.#algorithm],
       ...(this.#issuer ? { issuer: this.#issuer } : {}),
       ...(this.#audience ? { audience: this.#audience as jwt.VerifyOptions['audience'] } : {}),
+      ...(this.#clockTolerance !== undefined ? { clockTolerance: this.#clockTolerance } : {}),
     }
     return jwt.verify(token, this.#publicKey, verifyOptions)
   }

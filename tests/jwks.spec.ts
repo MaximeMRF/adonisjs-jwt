@@ -391,4 +391,69 @@ test.group('Jwt guard | JWKS', (group) => {
       /JwtGuard JWKS validation failed: unsupported algorithm\(s\): HS256/
     )
   })
+
+  test('fail when JWKS token has the wrong {claim}')
+    .with([
+      { claim: 'audience', signOptions: { issuer: 'jwks-issuer', audience: 'another-app' } },
+      { claim: 'issuer', signOptions: { issuer: 'another-issuer', audience: 'jwks-audience' } },
+    ])
+    .run(async ({ assert }, { signOptions }) => {
+      const { privateKey, jwk, kid } = generateKeys()
+      const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+      nock('https://fake-auth.com')
+        .get('/.well-known/jwks.json')
+        .reply(200, { keys: [jwk] })
+
+      const ctx = new HttpContextFactory().create()
+      const userProvider = new JwtFakeUserProvider()
+
+      const guard = new JwtGuard(ctx, userProvider, {
+        secret: 'ignored',
+        jwks: { jwksUri },
+        issuer: 'jwks-issuer',
+        audience: 'jwks-audience',
+      })
+
+      const token = jwt.sign({ userId: 1 }, privateKey, {
+        algorithm: 'RS256',
+        keyid: kid,
+        ...signOptions,
+      })
+
+      ctx.request.request.headers.authorization = `Bearer ${token}`
+
+      await assert.rejects(() => guard.authenticate(), 'Unauthorized access')
+    })
+
+  test('accept a recently expired JWKS token within clockTolerance', async ({ assert }) => {
+    const { privateKey, jwk, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+    nock('https://fake-auth.com')
+      .get('/.well-known/jwks.json')
+      .times(2)
+      .reply(200, { keys: [jwk] })
+
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    // Expired 10 seconds ago
+    const token = jwt.sign({ userId: 1, exp: Math.floor(Date.now() / 1000) - 10 }, privateKey, {
+      algorithm: 'RS256',
+      keyid: kid,
+    })
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+
+    const strictGuard = new JwtGuard(ctx, userProvider, { secret: 'ignored', jwks: { jwksUri } })
+    await assert.rejects(() => strictGuard.authenticate(), 'Unauthorized access')
+
+    const tolerantGuard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+      clockTolerance: 30,
+    })
+    const user = await tolerantGuard.authenticate()
+    assert.equal(user.id, 1)
+  })
 })

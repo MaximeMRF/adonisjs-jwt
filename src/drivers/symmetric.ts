@@ -8,8 +8,14 @@ export class SymmetricDriver implements JwtDriver {
   #secret: string
   #issuer?: string
   #audience?: string | string[]
+  #clockTolerance?: number
 
-  constructor(options: { secret: string; issuer?: string; audience?: string | string[] }) {
+  constructor(options: {
+    secret: string
+    issuer?: string
+    audience?: string | string[]
+    clockTolerance?: number
+  }) {
     if (!options.secret) {
       throw new Error('Symmetric JWT driver requires a secret key')
     }
@@ -21,6 +27,7 @@ export class SymmetricDriver implements JwtDriver {
     this.#secret = options.secret
     this.#issuer = options.issuer
     this.#audience = options.audience
+    this.#clockTolerance = options.clockTolerance
   }
 
   sign(payload: Record<string, any>, options?: { expiresIn?: number | StringValue }): string {
@@ -37,6 +44,7 @@ export class SymmetricDriver implements JwtDriver {
       algorithms: [...ALLOWED_SYMMETRIC_ALGORITHMS],
       ...(this.#issuer ? { issuer: this.#issuer } : {}),
       ...(this.#audience ? { audience: this.#audience as jwt.VerifyOptions['audience'] } : {}),
+      ...(this.#clockTolerance !== undefined ? { clockTolerance: this.#clockTolerance } : {}),
     }
     return jwt.verify(token, this.#secret, verifyOptions)
   }

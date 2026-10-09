@@ -210,12 +210,76 @@ jwt: jwtGuard({
   issuer: 'https://your-auth-server',
   audience: 'my-api',
   algorithms: ['RS256'],
+  // seconds of clock skew tolerated on `exp` / `nbf` (optional, works in every mode)
+  clockTolerance: 30,
   // default: (payload) => payload.userId
   getUserId: (payload) => payload.sub,
 }),
 ```
 
-For example, this lets you authenticate Kubernetes ServiceAccount tokens using the API server's JWKS (`https://kubernetes.default.svc/openid/v1/jwks`).
+> [!WARNING]
+> Always set `audience` (and `issuer`) in JWKS mode. Without them, **any** token signed by the identity provider is accepted, including tokens issued for other applications. With Kubernetes, that means every pod's default ServiceAccount token.
+
+### Example: Kubernetes ServiceAccount tokens
+
+The Kubernetes API server exposes its signing keys at `https://kubernetes.default.svc/openid/v1/jwks`. From inside the cluster, fetching them requires the cluster CA and a ServiceAccount token, which you can provide with a custom jwks-rsa `fetcher` (the token is re-read on each fetch because projected tokens are rotated):
+
+```typescript
+import { readFileSync } from 'node:fs'
+import https from 'node:https'
+
+const SA_DIR = '/var/run/secrets/kubernetes.io/serviceaccount'
+
+jwt: jwtGuard({
+  // findById receives the token `sub`, e.g. "system:serviceaccount:my-namespace:my-sa"
+  provider: new ServiceAccountUserProvider(),
+  jwks: {
+    jwksUri: 'https://kubernetes.default.svc/openid/v1/jwks',
+    cache: true,
+    fetcher: (uri) =>
+      new Promise((resolve, reject) => {
+        https
+          .get(
+            uri,
+            {
+              ca: readFileSync(`${SA_DIR}/ca.crt`),
+              headers: { Authorization: `Bearer ${readFileSync(`${SA_DIR}/token`, 'utf8')}` },
+            },
+            (res) => {
+              let body = ''
+              res.on('data', (chunk) => (body += chunk))
+              res.on('end', () => {
+                if (res.statusCode !== 200) {
+                  return reject(new Error(`JWKS fetch failed with status ${res.statusCode}`))
+                }
+                resolve(JSON.parse(body))
+              })
+            }
+          )
+          .on('error', reject)
+      }),
+  },
+  // must match the `audiences` of the projected token mounted in the calling pods
+  audience: 'my-api',
+  issuer: 'https://kubernetes.default.svc.cluster.local',
+  getUserId: (payload) => payload.sub,
+}),
+```
+
+The calling pod mounts a projected token with that audience and sends it as a Bearer token:
+
+```yaml
+volumes:
+  - name: api-token
+    projected:
+      sources:
+        - serviceAccountToken:
+            path: token
+            audience: my-api
+            expirationSeconds: 3600
+```
+
+Check your cluster's issuer with `kubectl get --raw /.well-known/openid-configuration`.
 
 ## Refresh Tokens
 
