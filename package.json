@@ -12,6 +12,7 @@
     "build/src",
     "build/stubs",
     "build/index.d.ts",
+    "build/index.js",
     "build/configure.d.ts",
     "build/configure.js"
   ],
