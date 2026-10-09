@@ -36,7 +36,7 @@ export class SymmetricDriver implements JwtDriver {
     const verifyOptions: jwt.VerifyOptions = {
       algorithms: [...ALLOWED_SYMMETRIC_ALGORITHMS],
       ...(this.#issuer ? { issuer: this.#issuer } : {}),
-      ...(this.#audience ? { audience: this.#audience } : {}),
+      ...(this.#audience ? { audience: this.#audience as jwt.VerifyOptions['audience'] } : {}),
     }
     return jwt.verify(token, this.#secret, verifyOptions)
   }

@@ -69,7 +69,7 @@ export class AsymmetricDriver implements JwtDriver {
     const verifyOptions: jwt.VerifyOptions = {
       algorithms: [this.#algorithm],
       ...(this.#issuer ? { issuer: this.#issuer } : {}),
-      ...(this.#audience ? { audience: this.#audience } : {}),
+      ...(this.#audience ? { audience: this.#audience as jwt.VerifyOptions['audience'] } : {}),
     }
     return jwt.verify(token, this.#publicKey, verifyOptions)
   }

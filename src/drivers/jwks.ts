@@ -4,18 +4,40 @@ import type { Options } from 'jwks-rsa'
 import type { StringValue } from 'ms'
 import { JwksManager } from '../jwks.js'
 import type { JwtDriver } from './types.js'
-import { ALLOWED_JWKS_ALGORITHMS } from '../types.js'
+import { ALLOWED_JWKS_ALGORITHMS, type JwtJwksAlgorithm } from '../types.js'
 
 export class JwksDriver implements JwtDriver {
   readonly canSign = false
   #jwksManager: JwksManager
   #issuer?: string
   #audience?: string | string[]
+  #algorithms: JwtJwksAlgorithm[]
 
-  constructor(options: Options, driverOptions?: { issuer?: string; audience?: string | string[] }) {
+  constructor(
+    options: Options,
+    driverOptions?: {
+      issuer?: string
+      audience?: string | string[]
+      algorithms?: JwtJwksAlgorithm[]
+    }
+  ) {
+    const algorithms = driverOptions?.algorithms ?? [...ALLOWED_JWKS_ALGORITHMS]
+    if (algorithms.length === 0) {
+      throw new Error('`algorithms` must not be empty')
+    }
+    const unsupported = algorithms.filter(
+      (alg) => !(ALLOWED_JWKS_ALGORITHMS as readonly string[]).includes(alg)
+    )
+    if (unsupported.length > 0) {
+      throw new Error(
+        `unsupported algorithm(s): ${unsupported.join(', ')}. Allowed: ${ALLOWED_JWKS_ALGORITHMS.join(', ')}`
+      )
+    }
+
     this.#jwksManager = new JwksManager(options)
     this.#issuer = driverOptions?.issuer
     this.#audience = driverOptions?.audience
+    this.#algorithms = algorithms
   }
 
   sign(_payload: Record<string, any>, _options?: { expiresIn?: number | StringValue }): never {
@@ -33,9 +55,9 @@ export class JwksDriver implements JwtDriver {
     }
     const key = await this.#jwksManager.getSigningKey(decoded.header.kid)
     const verifyOptions: jwt.VerifyOptions = {
-      algorithms: [...ALLOWED_JWKS_ALGORITHMS],
+      algorithms: [...this.#algorithms],
       ...(this.#issuer ? { issuer: this.#issuer } : {}),
-      ...(this.#audience ? { audience: this.#audience } : {}),
+      ...(this.#audience ? { audience: this.#audience as jwt.VerifyOptions['audience'] } : {}),
     }
     return jwt.verify(token, key, verifyOptions)
   }

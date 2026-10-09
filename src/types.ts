@@ -77,6 +77,14 @@ export const ALLOWED_JWKS_ALGORITHMS = [
 
 export type JwtJwksAlgorithm = (typeof ALLOWED_JWKS_ALGORITHMS)[number]
 
+export type JwtGenerateResult = {
+  type: string
+  token: string
+  expiresIn?: number | StringValue
+  refreshToken?: string
+  refreshTokenExpiresIn?: number | StringValue
+}
+
 export type JwtGuardOptions<RealUser extends any = unknown> = {
   driver?: JwtDriver
   /**
@@ -105,7 +113,7 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   useCookiesForRefreshToken?: boolean
   refreshTokenAbilities?: string[]
   cookie?: JwtCookieOptions
-  content?: (user: JwtGuardUser<RealUser>) => Record<string, any>
+  content?: (user: JwtGuardUser<RealUser>) => Record<string, any> & BaseJwtContent
   /**
    * Expected JWT issuer (iss). Validated during token verification.
    */
@@ -114,4 +122,18 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
    * Expected JWT audience (aud). Validated during token verification.
    */
   audience?: string | string[]
+  /**
+   * Algorithms accepted when verifying tokens in JWKS mode.
+   * Must be a non-empty subset of `ALLOWED_JWKS_ALGORITHMS` (default: all of them).
+   */
+  algorithms?: JwtJwksAlgorithm[]
+  /**
+   * Extract the user id from a verified token payload.
+   * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
+   */
+  getUserId?: JwtGetUserId
 }
+
+export type JwtGetUserId = (
+  payload: Record<string, any>
+) => string | number | BigInt | undefined | null

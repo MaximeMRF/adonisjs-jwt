@@ -265,4 +265,130 @@ test.group('Jwt guard | JWKS', (group) => {
       await guard.authenticate()
     })
   })
+
+  test('authenticate using JWKS with a custom getUserId', async ({ assert }) => {
+    const { privateKey, jwk, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+    nock('https://fake-auth.com')
+      .get('/.well-known/jwks.json')
+      .reply(200, { keys: [jwk] })
+
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+      issuer: 'https://kubernetes.default.svc.cluster.local',
+      audience: 'mailbox-api',
+      getUserId: (payload) => Number(payload.sub),
+    })
+
+    // Shaped like an external IdP / Kubernetes ServiceAccount token: no userId claim
+    const token = jwt.sign({ sub: '1' }, privateKey, {
+      algorithm: 'RS256',
+      keyid: kid,
+      issuer: 'https://kubernetes.default.svc.cluster.local',
+      audience: 'mailbox-api',
+    })
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+
+    const user = await guard.authenticate()
+    assert.equal(user.id, 1)
+  })
+
+  test('fail when getUserId returns nothing', async ({ assert }) => {
+    const { privateKey, jwk, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+    nock('https://fake-auth.com')
+      .get('/.well-known/jwks.json')
+      .reply(200, { keys: [jwk] })
+
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+      getUserId: (payload) => payload.sub,
+    })
+
+    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid })
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+
+    await assert.rejects(() => guard.authenticate(), 'Unauthorized access')
+  })
+
+  test('fail when token algorithm is not in the configured algorithms', async ({ assert }) => {
+    const { privateKey, jwk, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+    nock('https://fake-auth.com')
+      .get('/.well-known/jwks.json')
+      .reply(200, { keys: [jwk] })
+
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+      algorithms: ['PS256'],
+    })
+
+    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid })
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+
+    await assert.rejects(() => guard.authenticate(), 'Unauthorized access')
+  })
+
+  test('authenticate when token algorithm is in the configured algorithms', async ({ assert }) => {
+    const { privateKey, jwk, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+
+    nock('https://fake-auth.com')
+      .get('/.well-known/jwks.json')
+      .reply(200, { keys: [jwk] })
+
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+      algorithms: ['RS256'],
+    })
+
+    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid })
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+
+    const user = await guard.authenticate()
+    assert.equal(user.id, 1)
+  })
+
+  test('throw when algorithms is empty or contains an unsupported algorithm', ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const jwks = { jwksUri: 'https://fake-auth.com/.well-known/jwks.json' }
+
+    assert.throws(
+      () => new JwtGuard(ctx, userProvider, { secret: 'ignored', jwks, algorithms: [] }),
+      'JwtGuard JWKS validation failed: `algorithms` must not be empty'
+    )
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, userProvider, {
+          secret: 'ignored',
+          jwks,
+          algorithms: ['HS256' as any],
+        }),
+      /JwtGuard JWKS validation failed: unsupported algorithm\(s\): HS256/
+    )
+  })
 })

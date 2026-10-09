@@ -199,6 +199,24 @@ jwt: jwtGuard({
 > [!WARNING]
 > If you enable JWKS, you cannot use the `auth.use('jwt').generate(user)` and `auth.use('jwt').generateWithRefreshToken()` method because the token is signed by an external provider. You can only use the `authenticate` (or `check` / `getUserOrFail`) method to verify the token.
 
+Tokens issued by an external provider usually don't carry a `userId` claim. Use `getUserId` to tell the guard where to find the user id, and `algorithms` to restrict the accepted signing algorithms (default: every asymmetric algorithm supported in JWKS mode; symmetric `HS*` algorithms are never accepted):
+
+```typescript
+jwt: jwtGuard({
+  // ...
+  jwks: {
+    jwksUri: 'https://your-auth-server/.well-known/jwks.json',
+  },
+  issuer: 'https://your-auth-server',
+  audience: 'my-api',
+  algorithms: ['RS256'],
+  // default: (payload) => payload.userId
+  getUserId: (payload) => payload.sub,
+}),
+```
+
+For example, this lets you authenticate Kubernetes ServiceAccount tokens using the API server's JWKS (`https://kubernetes.default.svc/openid/v1/jwks`).
+
 ## Refresh Tokens
 
 To use refresh tokens, you have to set the `refreshTokenUserProvider` in the guard configuration, see the example above.

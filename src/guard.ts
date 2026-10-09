@@ -1,15 +1,17 @@
 import { symbols, errors } from '@adonisjs/auth'
 import type { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
-import type { StringValue } from 'ms'
-import type { JwtUserProviderContract, JwtGuardOptions, JwtCookieOptions } from './types.js'
+import type {
+  JwtUserProviderContract,
+  JwtGuardOptions,
+  JwtCookieOptions,
+  JwtGenerateResult,
+} from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
-import { SymmetricDriver } from './drivers/symmetric.js'
-import { AsymmetricDriver } from './drivers/asymmetric.js'
-import { JwksDriver } from './drivers/jwks.js'
 import type { JwtDriver } from './drivers/types.js'
 import { validateGuardOptions } from './validation.js'
+import { resolveDriver } from './driver_resolver.js'
 
 export class JwtGuard<
   UserProvider extends JwtUserProviderContract<unknown>,
@@ -44,38 +46,7 @@ export class JwtGuard<
     }
 
     validateGuardOptions(this.#options, 'JwtGuard')
-
-    const usesAsymmetric =
-      this.#options.privateKey !== undefined &&
-      this.#options.publicKey !== undefined &&
-      this.#options.algorithm !== undefined
-
-    if (this.#options.driver) {
-      this.#driver = this.#options.driver
-    } else if (this.#options.jwks) {
-      this.#driver = new JwksDriver(this.#options.jwks, {
-        issuer: this.#options.issuer,
-        audience: this.#options.audience,
-      })
-    } else if (usesAsymmetric) {
-      try {
-        this.#driver = new AsymmetricDriver({
-          privateKey: this.#options.privateKey!,
-          publicKey: this.#options.publicKey!,
-          algorithm: this.#options.algorithm!,
-          issuer: this.#options.issuer,
-          audience: this.#options.audience,
-        })
-      } catch (error) {
-        throw new Error(`JwtGuard asymmetric key validation failed: ${(error as Error).message}`)
-      }
-    } else {
-      this.#driver = new SymmetricDriver({
-        secret: this.#options.secret!,
-        issuer: this.#options.issuer,
-        audience: this.#options.audience,
-      })
-    }
+    this.#driver = resolveDriver(this.#options, 'JwtGuard')
   }
 
   #signAccessToken(payload: Record<string, any>) {
@@ -130,7 +101,9 @@ export class JwtGuard<
   /**
    * Generate a JWT token for a given user.
    */
-  async generate(user: UserProvider[typeof symbols.PROVIDER_REAL_USER]) {
+  async generate(
+    user: UserProvider[typeof symbols.PROVIDER_REAL_USER]
+  ): Promise<JwtGenerateResult> {
     if (!this.#driver.canSign) {
       throw new errors.E_UNAUTHORIZED_ACCESS("You can't use the auth.generate method with jwks", {
         guardDriverName: this.driverName,
@@ -218,12 +191,15 @@ export class JwtGuard<
       })
     }
 
-    if (
-      !payload ||
-      typeof payload !== 'object' ||
-      (payload as Record<string, any>).userId === undefined ||
-      (payload as Record<string, any>).userId === null
-    ) {
+    if (!payload || typeof payload !== 'object') {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    const getUserId = this.#options.getUserId ?? ((claims) => claims.userId)
+    const userId = getUserId(payload)
+    if (userId === undefined || userId === null) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })
@@ -232,9 +208,7 @@ export class JwtGuard<
     /**
      * Fetch the user by user ID and save a reference to it
      */
-    const providerUser = await this.#userProvider.findById(
-      (payload as { userId: string | number | BigInt }).userId
-    )
+    const providerUser = await this.#userProvider.findById(userId)
     if (!providerUser) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
@@ -249,16 +223,7 @@ export class JwtGuard<
     return this.getUserOrFail()
   }
 
-  async generateWithRefreshToken(refreshToken?: string): Promise<
-    | {
-        type: string
-        token: string
-        expiresIn: number | StringValue | undefined
-        refreshToken: string | undefined
-        refreshTokenExpiresIn: number | StringValue | undefined
-      }
-    | undefined
-  > {
+  async generateWithRefreshToken(refreshToken?: string): Promise<JwtGenerateResult | undefined> {
     this.authenticationAttempted = true
 
     if (!this.#driver.canSign) {

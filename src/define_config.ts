@@ -5,17 +5,17 @@ import type {
   JwtGuardUser,
   JwtUserProviderContract,
   JwtCookieOptions,
+  BaseJwtContent,
+  JwtJwksAlgorithm,
+  JwtGetUserId,
 } from './types.js'
 import { JwtGuard } from './guard.js'
 import type { Secret } from '@adonisjs/core/helpers'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
-import { SymmetricDriver } from './drivers/symmetric.js'
-import { AsymmetricDriver } from './drivers/asymmetric.js'
-import { JwksDriver } from './drivers/jwks.js'
-import type { JwtDriver } from './drivers/types.js'
 import { validateGuardOptions } from './validation.js'
+import { resolveDriver } from './driver_resolver.js'
 
 export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
   provider: UserProvider
@@ -31,11 +31,13 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   privateKey?: string
   publicKey?: string
   algorithm?: JwtAsymmetricAlgorithm
-  content?: <T>(user: JwtGuardUser<T>) => Record<string | number, any>
+  content?: <T>(user: JwtGuardUser<T>) => Record<string, any> & BaseJwtContent
   jwks?: Options
   cookie?: JwtCookieOptions
   issuer?: string
   audience?: string | string[]
+  algorithms?: JwtJwksAlgorithm[]
+  getUserId?: JwtGetUserId
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(_, app) {
@@ -49,46 +51,12 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
 
       validateGuardOptions(resolvedConfig, 'JWT guard')
 
+      const driver = resolveDriver(resolvedConfig, 'JWT guard')
+
       const usesAsymmetric =
         config.privateKey !== undefined &&
         config.publicKey !== undefined &&
         config.algorithm !== undefined
-
-      if (usesAsymmetric) {
-        try {
-          new AsymmetricDriver({
-            privateKey: config.privateKey!,
-            publicKey: config.publicKey!,
-            algorithm: config.algorithm!,
-            issuer: config.issuer,
-            audience: config.audience,
-          })
-        } catch (error) {
-          throw new Error(`JWT guard asymmetric key validation failed: ${(error as Error).message}`)
-        }
-      }
-
-      let driver: JwtDriver
-      if (config.jwks) {
-        driver = new JwksDriver(config.jwks, {
-          issuer: config.issuer,
-          audience: config.audience,
-        })
-      } else if (usesAsymmetric) {
-        driver = new AsymmetricDriver({
-          privateKey: config.privateKey!,
-          publicKey: config.publicKey!,
-          algorithm: config.algorithm!,
-          issuer: config.issuer,
-          audience: config.audience,
-        })
-      } else {
-        driver = new SymmetricDriver({
-          secret: resolvedSecret,
-          issuer: config.issuer,
-          audience: config.audience,
-        })
-      }
 
       const options = {
         driver,
@@ -114,6 +82,8 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
         cookie: config.cookie,
         issuer: config.issuer,
         audience: config.audience,
+        algorithms: config.algorithms,
+        getUserId: config.getUserId,
       }
       return (ctx) => new JwtGuard(ctx, config.provider, options)
     },

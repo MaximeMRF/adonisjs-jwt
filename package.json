@@ -12,7 +12,6 @@
     "build/src",
     "build/stubs",
     "build/index.d.ts",
-    "build/index.js",
     "build/configure.d.ts",
     "build/configure.js"
   ],
@@ -21,11 +20,6 @@
     "./types": "./build/src/types.js",
     "./jwt_config": "./build/src/define_config.js",
     "./stubs": "./build/stubs/main.js"
-  },
-  "imports": {
-    "#generated/*": "./.adonisjs/server/*.js",
-    "#transformers/*": "./app/transformers/*.js",
-    "#database/*": "./database/*.js"
   },
   "scripts": {
     "prepare": "tsc && npm run copy:templates",
@@ -56,6 +50,7 @@
     "@japa/file-system": "^3.0.0",
     "@japa/runner": "^5.3.0",
     "@poppinss/ts-exec": "^1.4.4",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/nock": "^11.1.0",
     "@types/node": "^22.15.18",
     "c8": "^11.0.0",
@@ -72,7 +67,6 @@
     "youch": "^4.1.1"
   },
   "dependencies": {
-    "@types/jsonwebtoken": "^9.0.10",
     "jsonwebtoken": "^9.0.3",
     "jwks-rsa": "^4.1.0",
     "ms": "^2.1.3"
