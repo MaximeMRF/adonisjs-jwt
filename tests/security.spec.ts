@@ -206,9 +206,32 @@ test.group('Security | JWKS', (group) => {
             jwks: { jwksUri },
             ...options,
           }).resolver('jwt', fakeApp()),
-        /JWT guard JWKS validation failed: `issuer` and `audience` are required/
+        /JWT guard JWKS validation failed: `issuer` and either `audience` or `verifyPayload` are required/
       )
     })
+
+  test('accept verifyPayload instead of audience in JWKS mode', async ({ assert }) => {
+    const resolver = await jwtGuard({
+      provider: new JwtFakeUserProvider(),
+      jwks: { jwksUri },
+      issuer: 'jwks-issuer',
+      verifyPayload: (payload) => payload.client_id === 'my-client',
+    }).resolver('jwt', fakeApp())
+
+    assert.isFunction(resolver)
+  })
+
+  test('still require issuer when verifyPayload is set', async ({ assert }) => {
+    await assert.rejects(
+      () =>
+        jwtGuard({
+          provider: new JwtFakeUserProvider(),
+          jwks: { jwksUri },
+          verifyPayload: () => true,
+        }).resolver('jwt', fakeApp()),
+      /`issuer` and either `audience` or `verifyPayload` are required/
+    )
+  })
 
   test('rate limit JWKS fetches triggered by unknown kids', async ({ assert }) => {
     const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {

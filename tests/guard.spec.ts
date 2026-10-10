@@ -923,6 +923,58 @@ test.group('Jwt guard | issuer and audience validation', () => {
   })
 })
 
+test.group('Jwt guard | verifyPayload', () => {
+  test('reject tokens when verifyPayload returns {result}')
+    .with([
+      { result: 'false', verifyPayload: () => false },
+      { result: 'a promise resolving to false', verifyPayload: async () => false },
+    ])
+    .run(async ({ assert }, { verifyPayload }) => {
+      const ctx = new HttpContextFactory().create()
+      const userProvider = new JwtFakeUserProvider()
+      const secret = 'thisisasecretthisisasecretthisisasecret'
+      const signer = new JwtGuard(ctx, userProvider, { secret })
+      const user = await userProvider.findById(1)
+      const { token } = await signer.generate(user!.getOriginal())
+
+      const verifyingCtx = new HttpContextFactory().create()
+      verifyingCtx.request.request.headers.authorization = `Bearer ${token}`
+      const guard = new JwtGuard(verifyingCtx, userProvider, { secret, verifyPayload })
+
+      assert.isFalse(await guard.check())
+      assert.isFalse(guard.isAuthenticated)
+      assert.isUndefined(guard.user)
+    })
+
+  test('pass the verified payload to verifyPayload', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const secret = 'thisisasecretthisisasecretthisisasecret'
+    const signer = new JwtGuard(ctx, userProvider, {
+      secret,
+      content: (user) => ({ userId: user.getId(), tenant: 'acme' }),
+    })
+    const signedUser = await userProvider.findById(1)
+    const { token } = await signer.generate(signedUser!.getOriginal())
+
+    let received: Record<string, any> | undefined
+    const verifyingCtx = new HttpContextFactory().create()
+    verifyingCtx.request.request.headers.authorization = `Bearer ${token}`
+    const guard = new JwtGuard(verifyingCtx, userProvider, {
+      secret,
+      verifyPayload: (payload) => {
+        received = payload
+        return payload.tenant === 'acme'
+      },
+    })
+
+    const user = await guard.authenticate()
+    assert.equal(user.id, 1)
+    assert.equal(received?.tenant, 'acme')
+    assert.equal(received?.userId, 1)
+  })
+})
+
 test.group('Jwt guard | token sources', () => {
   test('authenticate sets currentToken to the token of the request', async ({ assert }) => {
     const ctx = new HttpContextFactory().create()

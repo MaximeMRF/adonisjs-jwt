@@ -33,11 +33,15 @@ export class JwksDriver implements JwtDriver {
       audience?: string | string[]
       algorithms?: JwtJwksAlgorithm[]
       clockTolerance?: number
+      verifiesPayload?: boolean
     }
   ) {
-    if (!driverOptions?.issuer || !hasAudience(driverOptions.audience)) {
+    if (
+      !driverOptions?.issuer ||
+      !(hasAudience(driverOptions.audience) || driverOptions.verifiesPayload)
+    ) {
       throw new Error(
-        '`issuer` and `audience` are required, otherwise any token signed by the identity provider is accepted, including tokens issued for other applications'
+        '`issuer` and either `audience` or `verifyPayload` are required, otherwise any token signed by the identity provider is accepted, including tokens issued for other applications'
       )
     }
 

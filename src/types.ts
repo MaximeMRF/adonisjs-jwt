@@ -141,7 +141,7 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   issuer?: string
   /**
    * Expected JWT audience (aud). Validated during token verification.
-   * Required in JWKS mode.
+   * Required in JWKS mode, unless `verifyPayload` is set.
    */
   audience?: string | string[]
   /**
@@ -158,7 +158,15 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
    * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
    */
   getUserId?: JwtGetUserId
+  /**
+   * Extra check on a verified token payload, run before looking up the user.
+   * Return `false` to reject the token. Use it to check claims other than
+   * `iss` and `aud`, e.g. `client_id` and `token_use` for Amazon Cognito.
+   */
+  verifyPayload?: JwtVerifyPayload
 }
+
+export type JwtVerifyPayload = (payload: Record<string, any>) => boolean | Promise<boolean>
 
 export type JwtGetUserId = (
   payload: Record<string, any>

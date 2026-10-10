@@ -212,6 +212,12 @@ export class JwtGuard<
       })
     }
 
+    if (this.#options.verifyPayload && !(await this.#options.verifyPayload(payload))) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
     const getUserId = this.#options.getUserId ?? ((claims) => claims.userId)
     const userId = getUserId(payload)
     if (userId === undefined || userId === null) {
