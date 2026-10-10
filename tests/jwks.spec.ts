@@ -342,6 +342,46 @@ test.group('Jwt guard | JWKS', (group) => {
     await assert.rejects(() => guard.authenticate(), 'Unauthorized access')
   })
 
+  test('authenticate Cognito-like access tokens without aud using verifyPayload', async ({
+    assert,
+  }) => {
+    const { privateKey, jwk, kid } = generateKeys()
+    const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'
+    const issuer = 'https://cognito-idp.eu-west-1.amazonaws.com/eu-west-1_abc'
+
+    nock('https://fake-auth.com')
+      .persist()
+      .get('/.well-known/jwks.json')
+      .reply(200, { keys: [jwk] })
+
+    // Cognito access tokens carry client_id and token_use, but no aud claim
+    const guardFor = (cognitoClaims: Record<string, any>) => {
+      const ctx = new HttpContextFactory().create()
+      const token = jwt.sign({ sub: '1', ...cognitoClaims }, privateKey, {
+        algorithm: 'RS256',
+        keyid: kid,
+        issuer,
+      })
+      ctx.request.request.headers.authorization = `Bearer ${token}`
+
+      return new JwtGuard(ctx, new JwtFakeUserProvider(), {
+        jwks: { jwksUri },
+        issuer,
+        verifyPayload: (payload) =>
+          payload.token_use === 'access' && payload.client_id === 'my-client',
+        getUserId: (payload) => Number(payload.sub),
+      })
+    }
+
+    const user = await guardFor({ token_use: 'access', client_id: 'my-client' }).authenticate()
+    assert.equal(user.id, 1)
+
+    // token issued for another app client of the user pool
+    assert.isFalse(await guardFor({ token_use: 'access', client_id: 'other' }).check())
+    // ID token of the right client
+    assert.isFalse(await guardFor({ token_use: 'id', client_id: 'my-client' }).check())
+  })
+
   test('fail when token algorithm is not in the configured algorithms', async ({ assert }) => {
     const { privateKey, jwk, kid } = generateKeys()
     const jwksUri = 'https://fake-auth.com/.well-known/jwks.json'

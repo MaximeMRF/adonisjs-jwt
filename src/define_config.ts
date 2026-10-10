@@ -9,6 +9,7 @@ import type {
   BaseJwtContent,
   JwtJwksAlgorithm,
   JwtGetUserId,
+  JwtVerifyPayload,
 } from './types.js'
 import { JwtGuard } from './guard.js'
 import type { Secret } from '@adonisjs/core/helpers'
@@ -44,6 +45,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   algorithms?: JwtJwksAlgorithm[]
   clockTolerance?: number
   getUserId?: JwtGetUserId
+  verifyPayload?: JwtVerifyPayload
 }): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
   return {
     async resolver(name, app) {
@@ -79,6 +81,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
         algorithms: config.algorithms,
         clockTolerance: config.clockTolerance,
         getUserId: config.getUserId,
+        verifyPayload: config.verifyPayload,
       }
 
       validateGuardOptions(options, 'JWT guard')
