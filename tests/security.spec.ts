@@ -135,12 +135,44 @@ test.group('Security | app key fallback', () => {
       { case: 'missing', appKey: undefined },
       { case: 'shorter than 32 characters', appKey: 'short-app-key' },
     ])
-    .run(async ({ assert }, { appKey }) => {
+    .run(async ({ assert, cleanup }, { appKey }) => {
+      const previous = process.env.APP_KEY
+      delete process.env.APP_KEY
+      cleanup(() => {
+        if (previous !== undefined) process.env.APP_KEY = previous
+      })
+
       await assert.rejects(
         () => jwtGuard({ provider: new JwtFakeUserProvider() }).resolver('jwt', fakeApp(appKey)),
-        'JWT guard requires `app.appKey` to be at least 32 characters when no `secret` is configured'
+        'JWT guard requires the application key (APP_KEY) to be at least 32 characters when no `secret` is configured'
       )
     })
+
+  test('read APP_KEY from the environment when config/app.ts has no appKey (AdonisJS v7)', async ({
+    assert,
+    cleanup,
+  }) => {
+    const previous = process.env.APP_KEY
+    process.env.APP_KEY = APP_KEY
+    cleanup(() => {
+      if (previous === undefined) delete process.env.APP_KEY
+      else process.env.APP_KEY = previous
+    })
+
+    const userProvider = new JwtFakeUserProvider()
+    const user = await userProvider.findById(1)
+
+    const v7Factory = await jwtGuard({ provider: userProvider }).resolver('jwt', fakeApp())
+    const { token } = await v7Factory(new HttpContextFactory().create()).generate(
+      user!.getOriginal()
+    )
+
+    // Same derived key as with app.appKey: tokens stay valid when moving to v7
+    const v6Factory = await jwtGuard({ provider: userProvider }).resolver('jwt', fakeApp(APP_KEY))
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    assert.isTrue(await v6Factory(ctx).check())
+  })
 
   test('do not read the app key when a secret is configured', async ({ assert }) => {
     const factory = await jwtGuard({

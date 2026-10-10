@@ -12,6 +12,7 @@ import type {
 } from './types.js'
 import { JwtGuard } from './guard.js'
 import type { Secret } from '@adonisjs/core/helpers'
+import type { ApplicationService } from '@adonisjs/core/types'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
@@ -58,9 +59,7 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
        */
       const resolvedSecret =
         config.secret ??
-        (usesAsymmetric || config.jwks
-          ? undefined
-          : deriveSecretFromAppKey(app.config.get('app.appKey'), name))
+        (usesAsymmetric || config.jwks ? undefined : deriveSecretFromAppKey(readAppKey(app), name))
 
       const options = {
         ...(usesAsymmetric ? asymmetricKeys : { secret: resolvedSecret }),
@@ -96,15 +95,28 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
  * with the raw app key used elsewhere by the application, and two JWT guards
  * never accept each other's tokens.
  */
-function deriveSecretFromAppKey(appKey: Secret<string> | undefined, guardName: string) {
-  const rawAppKey = appKey?.release()
+function deriveSecretFromAppKey(rawAppKey: string | undefined, guardName: string) {
   if (!rawAppKey || rawAppKey.length < 32) {
     throw new Error(
-      'JWT guard requires `app.appKey` to be at least 32 characters when no `secret` is configured'
+      'JWT guard requires the application key (APP_KEY) to be at least 32 characters when no `secret` is configured'
     )
   }
 
   return Buffer.from(
     hkdfSync('sha256', rawAppKey, '', `@maximemrf/adonisjs-jwt:${guardName}`, 32)
   ).toString('hex')
+}
+
+/**
+ * AdonisJS v6 exposes the app key as `app.appKey` in config/app.ts. AdonisJS
+ * v7 apps only pass APP_KEY to config/encryption.ts, and the env loader
+ * copies it to process.env.
+ */
+function readAppKey(app: ApplicationService): string | undefined {
+  const appKey = app.config.get<Secret<string> | string | undefined>('app.appKey', undefined)
+  if (appKey) {
+    return typeof appKey === 'string' ? appKey : appKey.release()
+  }
+
+  return process.env.APP_KEY
 }
