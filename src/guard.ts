@@ -1,11 +1,12 @@
 import { symbols, errors } from '@adonisjs/auth'
 import type { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
-import type {
-  JwtUserProviderContract,
-  JwtGuardOptions,
-  JwtCookieOptions,
-  JwtGenerateResult,
+import {
+  DEFAULT_TOKEN_EXPIRES_IN,
+  type JwtUserProviderContract,
+  type JwtGuardOptions,
+  type JwtCookieOptions,
+  type JwtGenerateResult,
 } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
@@ -39,6 +40,10 @@ export class JwtGuard<
     if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
     this.#tokenName = this.#options.tokenName ?? 'token'
     this.#refreshTokenName = this.#options.refreshTokenName ?? 'refreshToken'
+    /**
+     * Never issue access tokens without an expiration
+     */
+    this.#options.tokenExpiresIn = this.#options.tokenExpiresIn ?? DEFAULT_TOKEN_EXPIRES_IN
     this.#cookieOptions = {
       httpOnly: true,
       secure: true,
@@ -50,7 +55,7 @@ export class JwtGuard<
   }
 
   #signAccessToken(payload: Record<string, any>) {
-    return this.#driver.sign(payload, { expiresIn: this.#options.expiresIn })
+    return this.#driver.sign(payload, { expiresIn: this.#options.tokenExpiresIn })
   }
 
   async #verifyAccessToken(token: string) {
@@ -58,14 +63,24 @@ export class JwtGuard<
   }
 
   #extractToken(): string | undefined {
-    const cookieToken = this.#ctx.request.cookie(this.#tokenName)
-    if (cookieToken) {
-      return cookieToken
-    }
-
+    /**
+     * The header is set explicitly by the client, so it takes precedence
+     * over the cookie, which the browser sends on every request (a stale
+     * cookie must not shadow a valid bearer token)
+     */
     const authHeader = this.#ctx.request.header('authorization')
     if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
-      return authHeader.slice(7).trim()
+      const headerToken = authHeader.slice(7).trim()
+      if (headerToken) {
+        return headerToken
+      }
+    }
+
+    if (this.#options.useCookies) {
+      const cookieToken = this.#ctx.request.cookie(this.#tokenName)
+      if (cookieToken) {
+        return cookieToken
+      }
     }
 
     return undefined
@@ -131,7 +146,7 @@ export class JwtGuard<
     if (this.#options.useCookies) {
       this.#ctx.response.cookie(`${this.#tokenName}`, token, {
         ...this.#cookieOptions,
-        maxAge: this.#options.expiresIn,
+        maxAge: this.#options.tokenExpiresIn,
       })
     }
 
@@ -145,7 +160,7 @@ export class JwtGuard<
     return {
       type: 'bearer',
       token: token,
-      expiresIn: this.#options.expiresIn,
+      expiresIn: this.#options.tokenExpiresIn,
       refreshToken: refreshToken,
       refreshTokenExpiresIn: this.#options.refreshTokenExpiresIn,
     }
@@ -169,7 +184,7 @@ export class JwtGuard<
     this.authenticationAttempted = true
 
     /**
-     * Try to read the token from the cookies.
+     * Read the token from the Authorization header or the cookie
      */
     const token = this.#extractToken()
     if (!token) {
@@ -192,6 +207,12 @@ export class JwtGuard<
     }
 
     if (!payload || typeof payload !== 'object') {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    if (this.#options.verifyPayload && !(await this.#options.verifyPayload(payload))) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })
@@ -223,7 +244,7 @@ export class JwtGuard<
     return this.getUserOrFail()
   }
 
-  async generateWithRefreshToken(refreshToken?: string): Promise<JwtGenerateResult | undefined> {
+  async generateWithRefreshToken(refreshToken?: string): Promise<JwtGenerateResult> {
     this.authenticationAttempted = true
 
     if (!this.#driver.canSign) {
@@ -251,6 +272,17 @@ export class JwtGuard<
     }
 
     /**
+     * When refresh token abilities are configured, reject tokens that
+     * don't have all of them (e.g. an API token from another provider)
+     */
+    const requiredAbilities = this.#options.refreshTokenAbilities ?? []
+    if (!requiredAbilities.every((ability) => accessToken.allows(ability))) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
+    }
+
+    /**
      * Fetch the user by user ID
      */
     const providerUser = await this.#refreshTokenUserProvider.findById(accessToken.tokenableId)
@@ -260,13 +292,9 @@ export class JwtGuard<
       })
     }
 
-    this.isAuthenticated = true
-    this.user = providerUser.getOriginal() as UserProvider[typeof symbols.PROVIDER_REAL_USER] & {
-      currentToken: string
-    }
-
     /**
-     * Delete the refresh token from the database
+     * Delete the refresh token from the database. Only one of two concurrent
+     * requests using the same refresh token can delete it
      */
     const isDeleted = await this.#refreshTokenUserProvider.invalidateToken(new Secret(refreshToken))
     if (!isDeleted) {
@@ -275,20 +303,40 @@ export class JwtGuard<
       })
     }
 
-    return this.generate(this.user)
+    const user = providerUser.getOriginal() as UserProvider[typeof symbols.PROVIDER_REAL_USER] & {
+      currentToken: string
+    }
+    const result = await this.generate(user)
+
+    /**
+     * Like after `authenticate()`, `currentToken` holds the access token
+     * of the request, here the one that has just been issued
+     */
+    this.isAuthenticated = true
+    this.user = user
+    this.user.currentToken = result.token
+
+    return result
   }
 
   async #findRefreshToken(): Promise<string> {
-    const bodyToken = this.#ctx.request.input('refreshToken')
-    if (bodyToken) {
-      return bodyToken
-    }
-
+    /**
+     * The cookie is the configured transport, so it takes precedence
+     */
     if (this.#options.useCookiesForRefreshToken) {
       const cookieToken = this.#ctx.request.cookie(this.#refreshTokenName)
       if (cookieToken) {
         return cookieToken
       }
+    }
+
+    /**
+     * Only read the request body: a refresh token passed in the
+     * query string would end up in access logs and Referer headers
+     */
+    const bodyToken = this.#ctx.request.body()[this.#refreshTokenName]
+    if (typeof bodyToken === 'string' && bodyToken) {
+      return bodyToken
     }
 
     const authHeader = this.#ctx.request.header('authorization')
@@ -316,6 +364,8 @@ export class JwtGuard<
       })
     }
 
+    this.#clearCookies()
+
     if (!refreshToken) {
       try {
         refreshToken = await this.#findRefreshToken()
@@ -325,6 +375,19 @@ export class JwtGuard<
     }
 
     await this.#refreshTokenUserProvider.invalidateToken(new Secret(refreshToken))
+  }
+
+  /**
+   * Remove the access and refresh token cookies set by the guard
+   */
+  #clearCookies() {
+    if (this.#options.useCookies) {
+      this.#ctx.response.clearCookie(this.#tokenName, this.#cookieOptions)
+    }
+
+    if (this.#options.useCookiesForRefreshToken) {
+      this.#ctx.response.clearCookie(this.#refreshTokenName, this.#cookieOptions)
+    }
   }
 
   /**

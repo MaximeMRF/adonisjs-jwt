@@ -1,6 +1,6 @@
 {
   "name": "@maximemrf/adonisjs-jwt",
-  "description": "Adonisjs v6 package for authentication with jwt token",
+  "description": "AdonisJS package for authentication with JWT tokens",
   "version": "0.9.0",
   "engines": {
     "node": ">=24.0.0"
@@ -53,7 +53,7 @@
     "@poppinss/ts-exec": "^1.4.4",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/nock": "^11.1.0",
-    "@types/node": "^22.15.18",
+    "@types/node": "^24.19.2",
     "c8": "^11.0.0",
     "copyfiles": "^2.4.1",
     "del-cli": "^7.0.0",
@@ -73,6 +73,7 @@
     "ms": "^2.1.3"
   },
   "peerDependencies": {
+    "@adonisjs/auth": "^10.1.0",
     "@adonisjs/core": "^7.0.1"
   },
   "author": "MaximeMRF",

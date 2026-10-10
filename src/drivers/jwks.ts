@@ -6,6 +6,18 @@ import { JwksManager } from '../jwks.js'
 import type { JwtDriver } from './types.js'
 import { ALLOWED_JWKS_ALGORITHMS, type JwtJwksAlgorithm } from '../types.js'
 
+/**
+ * Safe jwks-rsa defaults: tokens with an unknown `kid` trigger a JWKS
+ * fetch, so fetches must be cached and rate limited to avoid hammering
+ * the identity provider. They can be overridden through the `jwks` option.
+ */
+export const DEFAULT_JWKS_OPTIONS = {
+  cache: true,
+  rateLimit: true,
+  jwksRequestsPerMinute: 10,
+  timeout: 5000,
+} satisfies Partial<Options>
+
 export class JwksDriver implements JwtDriver {
   readonly canSign = false
   #jwksManager: JwksManager
@@ -21,9 +33,19 @@ export class JwksDriver implements JwtDriver {
       audience?: string | string[]
       algorithms?: JwtJwksAlgorithm[]
       clockTolerance?: number
+      verifiesPayload?: boolean
     }
   ) {
-    const algorithms = driverOptions?.algorithms ?? [...ALLOWED_JWKS_ALGORITHMS]
+    if (
+      !driverOptions?.issuer ||
+      !(hasAudience(driverOptions.audience) || driverOptions.verifiesPayload)
+    ) {
+      throw new Error(
+        '`issuer` and either `audience` or `verifyPayload` are required, otherwise any token signed by the identity provider is accepted, including tokens issued for other applications'
+      )
+    }
+
+    const algorithms = driverOptions.algorithms ?? [...ALLOWED_JWKS_ALGORITHMS]
     if (algorithms.length === 0) {
       throw new Error('`algorithms` must not be empty')
     }
@@ -36,10 +58,10 @@ export class JwksDriver implements JwtDriver {
       )
     }
 
-    this.#jwksManager = new JwksManager(options)
-    this.#issuer = driverOptions?.issuer
-    this.#audience = driverOptions?.audience
-    this.#clockTolerance = driverOptions?.clockTolerance
+    this.#jwksManager = new JwksManager({ ...DEFAULT_JWKS_OPTIONS, ...options })
+    this.#issuer = driverOptions.issuer
+    this.#audience = driverOptions.audience
+    this.#clockTolerance = driverOptions.clockTolerance
     this.#algorithms = algorithms
   }
 
@@ -65,4 +87,10 @@ export class JwksDriver implements JwtDriver {
     }
     return jwt.verify(token, key, verifyOptions)
   }
+}
+
+function hasAudience(audience?: string | string[]) {
+  return Array.isArray(audience)
+    ? audience.length > 0 && audience.every(Boolean)
+    : Boolean(audience)
 }
