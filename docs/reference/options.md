@@ -26,6 +26,12 @@ Don't set `exp`, use `tokenExpiresIn`.
 
 Default: `(payload) => payload.userId`. Use `(payload) => payload.sub` for tokens issued by an external provider.
 
+### verifyPayload
+
+`(payload) => boolean | Promise<boolean>`. Extra check on a verified payload, run before `getUserId`. Return `false` to reject the token.
+
+Default: none. In JWKS mode, it can replace `audience`, see [Check other claims](/guide/jwks#check-other-claims).
+
 ## Access tokens
 
 ### tokenExpiresIn
@@ -40,7 +46,7 @@ Default: `'1h'`. A number must be positive.
 
 ### audience
 
-`string | string[]`. Added as the `aud` claim to signed tokens, and required on incoming tokens. **Required** in JWKS mode.
+`string | string[]`. Added as the `aud` claim to signed tokens, and required on incoming tokens. **Required** in JWKS mode, unless `verifyPayload` is set.
 
 ### clockTolerance
 

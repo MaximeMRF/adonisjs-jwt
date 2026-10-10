@@ -31,6 +31,7 @@ export default defineConfig({
           { text: 'Cookies and token transport', link: '/guide/token-transport' },
           { text: 'Asymmetric signing', link: '/guide/asymmetric' },
           { text: 'JWKS', link: '/guide/jwks' },
+          { text: 'FerrisKey', link: '/guide/ferriskey' },
           { text: 'Kubernetes ServiceAccount tokens', link: '/guide/kubernetes' },
           { text: 'Testing', link: '/guide/testing' },
           { text: 'Security', link: '/guide/security' },
