@@ -19,6 +19,8 @@ import { mkdir, rm } from 'node:fs/promises'
 import { Emitter } from '@adonisjs/core/events'
 import { LoggerFactory } from '@adonisjs/core/factories/logger'
 import { Database } from '@adonisjs/lucid/database'
+import { CookieClient } from '@adonisjs/core/http'
+import { EncryptionFactory } from '@adonisjs/core/factories/encryption'
 
 /**
  * Travels time by seconds
@@ -131,4 +133,12 @@ export async function createTables(db: Database) {
     table.string('email').unique().notNullable()
     table.string('password').nullable()
   })
+}
+
+/**
+ * Returns a cookie value signed like `response.cookie()` does, so it
+ * can be read back with `request.cookie()` in a test HTTP context
+ */
+export function signCookie(name: string, value: string) {
+  return new CookieClient(new EncryptionFactory().create()).sign(name, value)
 }

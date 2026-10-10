@@ -5,7 +5,13 @@ import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { errors } from '@adonisjs/auth'
 import { type JwtAuthFakeUser, JwtFakeUserProvider } from '../factories/main.js'
 import jwt from 'jsonwebtoken'
-import { timeTravel, createDatabase, createTables, TEST_SECRET } from '../tests/helpers.js'
+import {
+  timeTravel,
+  createDatabase,
+  createTables,
+  signCookie,
+  TEST_SECRET,
+} from '../tests/helpers.js'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
 import { tokensUserProvider } from '@adonisjs/auth/access_tokens'
@@ -398,12 +404,7 @@ test.group('Jwt guard | authenticate', () => {
       useCookies: true,
     })
     const token = jwt.sign({ userId: 1 }, TEST_SECRET)
-    ctx.request.cookiesList().token = token
-
-    ctx.request.cookie = (key: string) => {
-      const cookies = { token: token }
-      return (cookies as Record<string, string>)[key]
-    }
+    ctx.request.request.headers.cookie = `token=${signCookie('token', token)}`
 
     const authenticatedUser = await guard.authenticate()
 
@@ -426,12 +427,7 @@ test.group('Jwt guard | authenticate', () => {
       tokenName: 'custom',
     })
     const token = jwt.sign({ userId: 1 }, TEST_SECRET)
-    ctx.request.cookiesList().custom = token
-
-    ctx.request.cookie = (key: string) => {
-      const cookies = { custom: token }
-      return (cookies as Record<string, string>)[key]
-    }
+    ctx.request.request.headers.cookie = `custom=${signCookie('custom', token)}`
 
     const authenticatedUser = await guard.authenticate()
 
@@ -477,7 +473,7 @@ test.group('Jwt guard | authenticate', () => {
     })
     const guard = new JwtGuard(ctx, userProvider, {
       secret: TEST_SECRET,
-      expiresIn: '1h',
+      tokenExpiresIn: '1h',
       content: jwtContentFn,
     })
     const user = await userProvider.findById(1)
@@ -619,10 +615,23 @@ test.group('Jwt guard | authenticate', () => {
       expiresIn: '1h',
     })
 
+    /**
+     * Control: the signed cookie is read and accepted before it expires,
+     * so the rejection below is caused by the expiration
+     */
+    const validCtx = new HttpContextFactory().create()
+    validCtx.request.request.headers.cookie = `token=${signCookie('token', token)}`
+    const validGuard = new JwtGuard(validCtx, userProvider, {
+      secret: TEST_SECRET,
+      useCookies: true,
+    })
+    await validGuard.authenticate()
+    assert.isTrue(validGuard.isAuthenticated)
+
     timeTravel(61 * 60)
 
-    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
-    ctx.request.request.headers.cookie = `token=${token}`
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET, useCookies: true })
+    ctx.request.request.headers.cookie = `token=${signCookie('token', token)}`
     const [result] = await Promise.allSettled([guard.authenticate()])
 
     assert.equal(result!.status, 'rejected')
@@ -911,5 +920,69 @@ test.group('Jwt guard | issuer and audience validation', () => {
     ctx.request.request.headers.authorization = `Bearer ${invalidToken}`
 
     await assert.rejects(async () => await guard.authenticate(), /Unauthorized access/)
+  })
+})
+
+test.group('Jwt guard | token sources', () => {
+  test('authenticate sets currentToken to the token of the request', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
+    const token = jwt.sign({ userId: 1 }, TEST_SECRET, { expiresIn: '1h' })
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+
+    const user = await guard.authenticate()
+    assert.equal(user.currentToken, token)
+  })
+
+  test('a valid bearer token takes precedence over an expired cookie', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      useCookies: true,
+    })
+    const expiredToken = jwt.sign(
+      { userId: 1, exp: Math.floor(Date.now() / 1000) - 60 },
+      TEST_SECRET
+    )
+    const validToken = jwt.sign({ userId: 1 }, TEST_SECRET, { expiresIn: '1h' })
+
+    ctx.request.request.headers.cookie = `token=${signCookie('token', expiredToken)}`
+    ctx.request.request.headers.authorization = `Bearer ${validToken}`
+
+    await guard.authenticate()
+    assert.isTrue(guard.isAuthenticated)
+  })
+
+  test('the cookie is used when no bearer token is sent', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      useCookies: true,
+    })
+    const token = jwt.sign({ userId: 1 }, TEST_SECRET, { expiresIn: '1h' })
+    ctx.request.request.headers.cookie = `token=${signCookie('token', token)}`
+
+    await guard.authenticate()
+    assert.isTrue(guard.isAuthenticated)
+  })
+
+  test('the cookie is ignored when useCookies is disabled', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+    })
+    const token = jwt.sign({ userId: 1 }, TEST_SECRET, { expiresIn: '1h' })
+    ctx.request.request.headers.cookie = `token=${signCookie('token', token)}`
+
+    await assert.rejects(async () => await guard.authenticate(), /Unauthorized access/)
+    assert.isFalse(guard.isAuthenticated)
   })
 })

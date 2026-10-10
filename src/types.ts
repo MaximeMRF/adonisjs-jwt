@@ -50,6 +50,11 @@ export type BaseJwtContent = {
   userId: string | number | BigInt
 }
 
+/**
+ * Lifetime of access tokens when `tokenExpiresIn` is not configured
+ */
+export const DEFAULT_TOKEN_EXPIRES_IN = '1h'
+
 export const ALLOWED_SYMMETRIC_ALGORITHMS = ['HS256', 'HS384', 'HS512'] as const
 export type JwtSymmetricAlgorithm = (typeof ALLOWED_SYMMETRIC_ALGORITHMS)[number]
 
@@ -86,6 +91,10 @@ export type JwtGenerateResult = {
 }
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
+  /**
+   * Driver resolved by `jwtGuard()`. Not part of the public API: custom
+   * drivers are not supported and the `JwtDriver` interface may change.
+   */
   driver?: JwtDriver
   /**
    * Symmetric signing secret (HMAC). Used when asymmetric keys are not set.
@@ -106,20 +115,33 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   jwks?: Options
   refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string
+  /**
+   * Name of the refresh token cookie and request body field.
+   * Defaults to `refreshToken`.
+   */
   refreshTokenName?: string
-  expiresIn?: number | StringValue
+  /**
+   * Lifetime of access tokens. Defaults to `DEFAULT_TOKEN_EXPIRES_IN`.
+   */
+  tokenExpiresIn?: number | StringValue
   refreshTokenExpiresIn?: number | StringValue
   useCookies?: boolean
   useCookiesForRefreshToken?: boolean
+  /**
+   * Abilities given to refresh tokens. When set, `generateWithRefreshToken`
+   * rejects refresh tokens that don't have all of them.
+   */
   refreshTokenAbilities?: string[]
   cookie?: JwtCookieOptions
   content?: (user: JwtGuardUser<RealUser>) => Record<string, any> & BaseJwtContent
   /**
    * Expected JWT issuer (iss). Validated during token verification.
+   * Required in JWKS mode.
    */
   issuer?: string
   /**
    * Expected JWT audience (aud). Validated during token verification.
+   * Required in JWKS mode.
    */
   audience?: string | string[]
   /**

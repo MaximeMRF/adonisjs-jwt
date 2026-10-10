@@ -1,6 +1,13 @@
 import type { JwtGuardOptions } from './types.js'
 
 export function validateGuardOptions(options: JwtGuardOptions, prefix: string = 'JwtGuard') {
+  if (
+    typeof options.tokenExpiresIn === 'number' &&
+    !(Number.isFinite(options.tokenExpiresIn) && options.tokenExpiresIn > 0)
+  ) {
+    throw new Error(`${prefix} \`tokenExpiresIn\` must be a positive number of seconds`)
+  }
+
   if (options.driver) {
     return
   }
