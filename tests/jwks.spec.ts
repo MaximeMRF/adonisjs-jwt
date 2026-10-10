@@ -11,6 +11,9 @@ test.group('Jwt guard | JWKS', (group) => {
     nock.cleanAll()
   })
 
+  // issuer and audience are mandatory in JWKS mode
+  const claims = { issuer: 'jwks-issuer', audience: 'jwks-audience' }
+
   const generateKeys = () => {
     const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
@@ -42,12 +45,14 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
     })
 
     const token = jwt.sign({ userId: 1 }, privateKey, {
       algorithm: 'RS256',
       keyid: kid,
       header: { kid, alg: 'RS256' },
+      ...claims,
     })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
@@ -102,12 +107,14 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
     })
 
     const token = jwt.sign({ userId: 1 }, privateKey, {
       algorithm: 'RS256',
       keyid: kid,
       header: { kid, alg: 'RS256' },
+      ...claims,
     })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
@@ -131,6 +138,7 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
     })
 
     // Sign with a kid that definitely doesn't match the one in JWK
@@ -138,6 +146,7 @@ test.group('Jwt guard | JWKS', (group) => {
       algorithm: 'RS256',
       keyid: 'other-kid',
       header: { kid: 'other-kid', alg: 'RS256' },
+      ...claims,
     })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
@@ -157,10 +166,12 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
     })
 
     const token = jwt.sign({ userId: 1 }, privateKey, {
       algorithm: 'RS256',
+      ...claims,
     })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
@@ -178,6 +189,7 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri: 'https://example.com' },
+      ...claims,
     })
 
     await assert.rejects(async () => {
@@ -194,6 +206,7 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri: 'https://example.com' },
+      ...claims,
     })
 
     await assert.rejects(async () => {
@@ -227,12 +240,14 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
     })
 
     // Sign with HS256 using the public key string as secret key (Algorithm Confusion Attack)
     const forgedToken = jwt.sign({ userId: 1 }, publicKey, {
       algorithm: 'HS256',
       header: { kid, alg: 'HS256' },
+      ...claims,
     })
 
     ctx.request.request.headers.authorization = `Bearer ${forgedToken}`
@@ -252,11 +267,14 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
     })
 
     // Construct a token with a header that omits the 'alg' property entirely
     const header = Buffer.from(JSON.stringify({ kid })).toString('base64url')
-    const payload = Buffer.from(JSON.stringify({ userId: 1 })).toString('base64url')
+    const payload = Buffer.from(
+      JSON.stringify({ userId: 1, iss: claims.issuer, aud: claims.audience })
+    ).toString('base64url')
     const token = `${header}.${payload}.dummysignature`
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
@@ -313,10 +331,11 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
       getUserId: (payload) => payload.sub,
     })
 
-    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid })
+    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid, ...claims })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
 
@@ -337,10 +356,11 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
       algorithms: ['PS256'],
     })
 
-    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid })
+    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid, ...claims })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
 
@@ -361,10 +381,11 @@ test.group('Jwt guard | JWKS', (group) => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
       algorithms: ['RS256'],
     })
 
-    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid })
+    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid, ...claims })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
 
@@ -378,7 +399,7 @@ test.group('Jwt guard | JWKS', (group) => {
     const jwks = { jwksUri: 'https://fake-auth.com/.well-known/jwks.json' }
 
     assert.throws(
-      () => new JwtGuard(ctx, userProvider, { secret: 'ignored', jwks, algorithms: [] }),
+      () => new JwtGuard(ctx, userProvider, { secret: 'ignored', jwks, ...claims, algorithms: [] }),
       'JwtGuard JWKS validation failed: `algorithms` must not be empty'
     )
     assert.throws(
@@ -386,6 +407,7 @@ test.group('Jwt guard | JWKS', (group) => {
         new JwtGuard(ctx, userProvider, {
           secret: 'ignored',
           jwks,
+          ...claims,
           algorithms: ['HS256' as any],
         }),
       /JwtGuard JWKS validation failed: unsupported algorithm\(s\): HS256/
@@ -442,15 +464,21 @@ test.group('Jwt guard | JWKS', (group) => {
     const token = jwt.sign({ userId: 1, exp: Math.floor(Date.now() / 1000) - 10 }, privateKey, {
       algorithm: 'RS256',
       keyid: kid,
+      ...claims,
     })
     ctx.request.request.headers.authorization = `Bearer ${token}`
 
-    const strictGuard = new JwtGuard(ctx, userProvider, { secret: 'ignored', jwks: { jwksUri } })
+    const strictGuard = new JwtGuard(ctx, userProvider, {
+      secret: 'ignored',
+      jwks: { jwksUri },
+      ...claims,
+    })
     await assert.rejects(() => strictGuard.authenticate(), 'Unauthorized access')
 
     const tolerantGuard = new JwtGuard(ctx, userProvider, {
       secret: 'ignored',
       jwks: { jwksUri },
+      ...claims,
       clockTolerance: 30,
     })
     const user = await tolerantGuard.authenticate()
