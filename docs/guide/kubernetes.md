@@ -105,3 +105,17 @@ The kubelet rotates this token before it expires, so the client must read the fi
 ::: info Revocation
 Tokens are verified offline against the JWKS, not through the Kubernetes `TokenReview` API. A token stays valid until its `exp` even if the pod it was issued for has been deleted (up to `expirationSeconds`, minimum 600). Keep `expirationSeconds` short, or call `TokenReview` from your user provider if you need immediate revocation.
 :::
+
+## What it protects against, and what it doesn't
+
+ServiceAccount tokens remove the shared secret between your services. There's no API key to leak from an environment variable or a Git repository, and no one can forge an identity without the cluster's signing key. The audience also works both ways: a token for `my-api` is rejected by the Kubernetes API server, so a compromised API can't reuse the tokens it receives to drive the cluster.
+
+The security boundary becomes Kubernetes RBAC, and a few things stay your job:
+
+- **A compromised pod is that service.** An attacker inside a client pod reads its token and calls your API as that ServiceAccount for as long as they stay in the pod. Authorize per service, so each ServiceAccount can only call the routes it needs.
+- **Whoever can get a token is that service.** Creating pods in the caller's namespace, `exec` into its pods, or the `create serviceaccounts/token` permission all give its token. Keep those rights tight.
+- **The bearer token travels over plain HTTP.** Anyone who can sniff the cluster's traffic sees it. Use TLS, or a service mesh with mTLS, if that's in your threat model.
+- **Keep internal routes internal.** Don't expose them through your ingress, and restrict who can reach the API with a NetworkPolicy. Your CNI has to enforce it.
+- **Never turn off TLS verification on the JWKS fetch.** The keys are public, but someone in the middle could serve their own and sign any token.
+
+You don't need an API key on top: it would bring back a secret to manage without closing any of these gaps.
