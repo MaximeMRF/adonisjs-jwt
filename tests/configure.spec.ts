@@ -137,6 +137,8 @@ test.group('Configure hook', (group) => {
     assert.match(migrations[0], /^\d+_create_jwt_refresh_tokens_table\.ts$/)
     const migration = await fs.contents(`database/migrations/${migrations[0]}`)
     assert.include(migration, "protected tableName = 'jwt_refresh_tokens'")
+    // the stub renderer drops the last newline, prettier wants one
+    assert.isTrue(migration.endsWith('}\n'))
 
     assert.deepEqual(
       actions.map((action) => action.status),

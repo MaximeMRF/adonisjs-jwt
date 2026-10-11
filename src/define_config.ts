@@ -21,9 +21,13 @@ import { validateGuardOptions } from './validation.js'
 import { resolveDriver } from './driver_resolver.js'
 import { hkdfSync } from 'node:crypto'
 
-export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(config: {
+export function jwtGuard<
+  UserProvider extends JwtUserProviderContract<unknown>,
+  RefreshTokenUserProvider extends AccessTokensUserProviderContract<unknown> | undefined =
+    undefined,
+>(config: {
   provider: UserProvider
-  refreshTokenUserProvider?: AccessTokensUserProviderContract<unknown>
+  refreshTokenUserProvider?: RefreshTokenUserProvider
   tokenName?: string
   refreshTokenName?: string
   tokenExpiresIn?: number | StringValue
@@ -46,7 +50,11 @@ export function jwtGuard<UserProvider extends JwtUserProviderContract<unknown>>(
   clockTolerance?: number
   getUserId?: JwtGetUserId
   verifyPayload?: JwtVerifyPayload
-}): GuardConfigProvider<(ctx: HttpContext) => JwtGuard<UserProvider>> {
+}): GuardConfigProvider<
+  (
+    ctx: HttpContext
+  ) => JwtGuard<UserProvider, [RefreshTokenUserProvider] extends [undefined] ? false : true>
+> {
   return {
     async resolver(name, app) {
       const asymmetricKeys = {
