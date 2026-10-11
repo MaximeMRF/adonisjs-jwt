@@ -104,7 +104,11 @@ async function runConfigure(
   return { command, actions, messages, prompted, migrations }
 }
 
-test.group('Configure hook', () => {
+test.group('Configure hook', (group) => {
+  // the hook loads the TypeScript compiler through ts-morph, which is slow
+  // under c8 and on Windows runners: the default 2s timeout is too short
+  group.each.timeout(10_000)
+
   test('add the jwt guard with refresh tokens', async ({ assert, fs }) => {
     const { actions, migrations, prompted } = await runConfigure(fs)
 
