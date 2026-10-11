@@ -26,7 +26,7 @@ Version 1.0 contains breaking changes. Check this list before upgrading from `0.
 
 - **Signing key**: without a `secret`, tokens are now signed with a key derived from the application key instead of the raw application key, and the application key must be at least 32 characters. Access tokens issued by `0.9.x` are rejected, so users have to log in again or use their refresh token, which stays valid. See [Security](#security).
 - **Default expiration**: `tokenExpiresIn` defaults to `1h`. A `content` function that sets `exp` itself now fails, use `tokenExpiresIn` instead.
-- **JWKS**: `issuer` and `audience` are required, the guard throws at startup if one of them is missing. See [JWKS](#jwks).
+- **JWKS**: `issuer` is required, along with `audience` or `verifyPayload`. The guard throws at startup if they are missing. See [JWKS](#jwks).
 - **Refresh token in the query string**: it is ignored, send it in the body, a cookie or the `Authorization` header.
 - **Refresh token body field**: the field follows `refreshTokenName`. If you set a custom `refreshTokenName` and your clients send the token in a `refreshToken` body field, rename that field to match `refreshTokenName`.
 - **Refresh token lookup order**: when `useCookiesForRefreshToken` is enabled, the cookie is now read before the request body. See [Refresh token transport](#refresh-token-transport).
@@ -210,7 +210,7 @@ jwt: jwtGuard({
 // ...
 ```
 
-`issuer` and `audience` are required in JWKS mode: the guard throws at startup if one of them is missing.
+`issuer` is required in JWKS mode, along with `audience` or `verifyPayload` (see [Checking other claims](#check-other-claims)): the guard throws at startup if they are missing.
 
 Tokens with an unknown `kid` trigger a JWKS fetch, so the guard applies these jwks-rsa defaults, which you can override in the `jwks` option: `cache: true`, `rateLimit: true`, `jwksRequestsPerMinute: 10` and `timeout: 5000` (ms).
 
@@ -236,7 +236,25 @@ jwt: jwtGuard({
 ```
 
 > [!WARNING]
-> `audience` and `issuer` are required in JWKS mode. Without them, **any** token signed by the identity provider would be accepted, including tokens issued for other applications. With Kubernetes, that means every pod's default ServiceAccount token.
+> `issuer` and `audience` (or `verifyPayload`) are required in JWKS mode. Without them, **any** token signed by the identity provider would be accepted, including tokens issued for other applications. With Kubernetes, that means every pod's default ServiceAccount token.
+
+### Check other claims
+
+Some providers don't put your application in the `aud` claim. Amazon Cognito access tokens, for example, carry the app client in `client_id` and have no `aud`. Use `verifyPayload` to check those claims: it receives the verified payload before the user lookup, and the request is rejected when it returns `false`. In JWKS mode, it can replace `audience`:
+
+```typescript
+jwt: jwtGuard({
+  // ...
+  jwks: {
+    jwksUri: 'https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/jwks.json',
+  },
+  issuer: 'https://cognito-idp.<region>.amazonaws.com/<userPoolId>',
+  verifyPayload: (payload) => payload.client_id === '<appClientId>' && payload.token_use === 'access',
+  getUserId: (payload) => payload.sub,
+}),
+```
+
+`verifyPayload` works in every mode and can be async.
 
 ### Example: Kubernetes ServiceAccount tokens
 
