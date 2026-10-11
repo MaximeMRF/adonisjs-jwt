@@ -93,7 +93,7 @@ jwtGuard({
 })
 ```
 
-They are required in [JWKS](/guide/jwks) mode.
+In [JWKS](/guide/jwks) mode, `issuer` is required, and so is `audience` unless [`verifyPayload`](/guide/jwks#check-other-claims) is set.
 
 ## Full example
 
