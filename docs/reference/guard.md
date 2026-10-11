@@ -24,6 +24,8 @@ type JwtGenerateResult = {
 }
 ```
 
+When the guard has a `refreshTokenUserProvider`, `refreshToken` is typed as `string`, so no non-null assertion is needed.
+
 Throws in JWKS mode.
 
 ### authenticate()
