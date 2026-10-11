@@ -7,6 +7,9 @@ import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import { generateKeyPairSync } from 'node:crypto'
 import { TEST_SECRET, SHORT_SECRET } from './helpers.js'
+import jwt from 'jsonwebtoken'
+import type { JwtGuardUser } from '../src/types.js'
+import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 
 test.group('JWT Drivers', () => {
   test('SymmetricDriver should throw error if secret is missing', ({ assert }) => {
@@ -57,7 +60,10 @@ test.group('JWT Drivers', () => {
   })
 
   test('JwksDriver sign should throw error', ({ assert }) => {
-    const driver = new JwksDriver({ jwksUri: 'https://example.com' })
+    const driver = new JwksDriver(
+      { jwksUri: 'https://example.com' },
+      { issuer: 'jwks-issuer', audience: 'jwks-audience' }
+    )
     assert.throws(
       () => driver.sign({ userId: 1 }),
       "You can't use the auth.generate method with jwks"
@@ -111,6 +117,72 @@ test.group('JWT Drivers', () => {
     assert.exists(tokenResult.token)
   })
 
+  test('jwtGuard content receives the user type of the provider', async ({ assert }) => {
+    const { jwtGuard } = await import('../src/define_config.js')
+    const userProvider = new JwtFakeUserProvider()
+
+    const provider = jwtGuard({
+      provider: userProvider,
+      secret: TEST_SECRET,
+      // No cast needed: getOriginal() is typed as JwtAuthFakeUser
+      content: (user) => ({ userId: user.getId(), email: user.getOriginal().email }),
+    })
+
+    // The 0.9 generic signature is still accepted
+    jwtGuard({
+      provider: userProvider,
+      secret: TEST_SECRET,
+      content: <T>(user: JwtGuardUser<T>) => ({ userId: user.getId() }),
+    })
+
+    const fakeApp = {
+      config: {
+        get: () => ({ release: () => 'appkey' }),
+      },
+    } as any
+
+    const guardFactory = await provider.resolver('jwt', fakeApp)
+    const guard = guardFactory(new HttpContextFactory().create())
+
+    const user = await userProvider.findById(1)
+    const { token } = await guard.generate(user!.getOriginal())
+    const payload = jwt.decode(token) as Record<string, any>
+    assert.equal(payload.email, user!.getOriginal().email)
+  })
+
+  test('generate() types refreshToken after refreshTokenUserProvider', async ({ assert }) => {
+    const { jwtGuard } = await import('../src/define_config.js')
+    const userProvider = new JwtFakeUserProvider()
+    const fakeApp = {} as any
+    const ctx = new HttpContextFactory().create()
+
+    const withRefreshTokens = await jwtGuard({
+      provider: userProvider,
+      secret: TEST_SECRET,
+      refreshTokenUserProvider: {} as AccessTokensUserProviderContract<unknown>,
+    }).resolver('jwt', fakeApp)
+    const withoutRefreshTokens = await jwtGuard({
+      provider: userProvider,
+      secret: TEST_SECRET,
+    }).resolver('jwt', fakeApp)
+
+    const guard = withRefreshTokens(ctx)
+    const guardWithout = withoutRefreshTokens(ctx)
+
+    /**
+     * Checked by the typecheck: the values only exist at the type level
+     */
+    type Result<T extends (...args: any[]) => Promise<any>> = Awaited<ReturnType<T>>
+    const generated: string = ({} as Result<typeof guard.generate>).refreshToken
+    const refreshed: string = ({} as Result<typeof guard.generateWithRefreshToken>).refreshToken
+    // @ts-expect-error without refreshTokenUserProvider, refreshToken may be undefined
+    const missing: string = ({} as Result<typeof guardWithout.generate>).refreshToken
+
+    assert.isUndefined(generated)
+    assert.isUndefined(refreshed)
+    assert.isUndefined(missing)
+  })
+
   test('jwtGuard config provider should resolve asymmetric driver and jwks driver', async ({
     assert,
   }) => {
@@ -140,6 +212,8 @@ test.group('JWT Drivers', () => {
     const jwksProvider = jwtGuard({
       provider: userProvider,
       jwks: { jwksUri: 'https://example.com' },
+      issuer: 'jwks-issuer',
+      audience: 'jwks-audience',
     })
     const jwksFactory = await jwksProvider.resolver('jwt', fakeApp)
     assert.exists(jwksFactory)

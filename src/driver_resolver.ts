@@ -17,6 +17,7 @@ export function resolveDriver(
     audience?: string | string[]
     algorithms?: JwtJwksAlgorithm[]
     clockTolerance?: number
+    verifyPayload?: unknown
   },
   contextName = 'JWT guard'
 ): JwtDriver {
@@ -36,6 +37,7 @@ export function resolveDriver(
         audience: options.audience,
         clockTolerance: options.clockTolerance,
         algorithms: options.algorithms,
+        verifiesPayload: options.verifyPayload !== undefined,
       })
     } catch (error) {
       throw new Error(`${contextName} JWKS validation failed: ${(error as Error).message}`)

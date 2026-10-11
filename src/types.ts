@@ -50,6 +50,11 @@ export type BaseJwtContent = {
   userId: string | number | BigInt
 }
 
+/**
+ * Lifetime of access tokens when `tokenExpiresIn` is not configured
+ */
+export const DEFAULT_TOKEN_EXPIRES_IN = '1h'
+
 export const ALLOWED_SYMMETRIC_ALGORITHMS = ['HS256', 'HS384', 'HS512'] as const
 export type JwtSymmetricAlgorithm = (typeof ALLOWED_SYMMETRIC_ALGORITHMS)[number]
 
@@ -77,15 +82,21 @@ export const ALLOWED_JWKS_ALGORITHMS = [
 
 export type JwtJwksAlgorithm = (typeof ALLOWED_JWKS_ALGORITHMS)[number]
 
-export type JwtGenerateResult = {
+/**
+ * `refreshToken` is a string when the guard has a `refreshTokenUserProvider`
+ */
+export type JwtGenerateResult<WithRefreshToken extends boolean = boolean> = {
   type: string
   token: string
   expiresIn?: number | StringValue
-  refreshToken?: string
   refreshTokenExpiresIn?: number | StringValue
-}
+} & ([WithRefreshToken] extends [true] ? { refreshToken: string } : { refreshToken?: string })
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
+  /**
+   * Driver resolved by `jwtGuard()`. Not part of the public API: custom
+   * drivers are not supported and the `JwtDriver` interface may change.
+   */
   driver?: JwtDriver
   /**
    * Symmetric signing secret (HMAC). Used when asymmetric keys are not set.
@@ -106,20 +117,33 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   jwks?: Options
   refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string
+  /**
+   * Name of the refresh token cookie and request body field.
+   * Defaults to `refreshToken`.
+   */
   refreshTokenName?: string
-  expiresIn?: number | StringValue
+  /**
+   * Lifetime of access tokens. Defaults to `DEFAULT_TOKEN_EXPIRES_IN`.
+   */
+  tokenExpiresIn?: number | StringValue
   refreshTokenExpiresIn?: number | StringValue
   useCookies?: boolean
   useCookiesForRefreshToken?: boolean
+  /**
+   * Abilities given to refresh tokens. When set, `generateWithRefreshToken`
+   * rejects refresh tokens that don't have all of them.
+   */
   refreshTokenAbilities?: string[]
   cookie?: JwtCookieOptions
   content?: (user: JwtGuardUser<RealUser>) => Record<string, any> & BaseJwtContent
   /**
    * Expected JWT issuer (iss). Validated during token verification.
+   * Required in JWKS mode.
    */
   issuer?: string
   /**
    * Expected JWT audience (aud). Validated during token verification.
+   * Required in JWKS mode, unless `verifyPayload` is set.
    */
   audience?: string | string[]
   /**
@@ -136,7 +160,15 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
    * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
    */
   getUserId?: JwtGetUserId
+  /**
+   * Extra check on a verified token payload, run before looking up the user.
+   * Return `false` to reject the token. Use it to check claims other than
+   * `iss` and `aud`, e.g. `client_id` and `token_use` for Amazon Cognito.
+   */
+  verifyPayload?: JwtVerifyPayload
 }
+
+export type JwtVerifyPayload = (payload: Record<string, any>) => boolean | Promise<boolean>
 
 export type JwtGetUserId = (
   payload: Record<string, any>
