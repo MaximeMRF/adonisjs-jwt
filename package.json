@@ -1,7 +1,7 @@
 {
   "name": "@maximemrf/adonisjs-jwt",
   "description": "AdonisJS package for authentication with JWT tokens",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.2",
   "engines": {
     "node": ">=24.0.0"
   },
