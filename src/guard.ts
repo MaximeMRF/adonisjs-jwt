@@ -16,6 +16,7 @@ import { resolveDriver } from './driver_resolver.js'
 
 export class JwtGuard<
   UserProvider extends JwtUserProviderContract<unknown>,
+  WithRefreshToken extends boolean = boolean,
 > implements GuardContract<UserProvider[typeof symbols.PROVIDER_REAL_USER]> {
   #ctx: HttpContext
   #userProvider: UserProvider
@@ -118,7 +119,7 @@ export class JwtGuard<
    */
   async generate(
     user: UserProvider[typeof symbols.PROVIDER_REAL_USER]
-  ): Promise<JwtGenerateResult> {
+  ): Promise<JwtGenerateResult<WithRefreshToken>> {
     if (!this.#driver.canSign) {
       throw new errors.E_UNAUTHORIZED_ACCESS("You can't use the auth.generate method with jwks", {
         guardDriverName: this.driverName,
@@ -163,7 +164,7 @@ export class JwtGuard<
       expiresIn: this.#options.tokenExpiresIn,
       refreshToken: refreshToken,
       refreshTokenExpiresIn: this.#options.refreshTokenExpiresIn,
-    }
+    } as JwtGenerateResult<WithRefreshToken>
   }
 
   /**
@@ -244,7 +245,7 @@ export class JwtGuard<
     return this.getUserOrFail()
   }
 
-  async generateWithRefreshToken(refreshToken?: string): Promise<JwtGenerateResult> {
+  async generateWithRefreshToken(refreshToken?: string): Promise<JwtGenerateResult<true>> {
     this.authenticationAttempted = true
 
     if (!this.#driver.canSign) {
@@ -316,7 +317,10 @@ export class JwtGuard<
     this.user = user
     this.user.currentToken = result.token
 
-    return result
+    /**
+     * The guard has a refresh token provider, so `generate()` issued a refresh token
+     */
+    return result as JwtGenerateResult<true>
   }
 
   async #findRefreshToken(): Promise<string> {

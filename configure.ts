@@ -11,7 +11,7 @@
 |
 */
 
-import { existsSync, readdirSync } from 'node:fs'
+import { appendFileSync, existsSync, readdirSync } from 'node:fs'
 import type ConfigureCommand from '@adonisjs/core/commands/configure'
 import type {
   CallExpression,
@@ -182,11 +182,18 @@ async function createMigration(
     return
   }
 
-  await codemods.makeUsingStub(stubsRoot, 'migration.stub', {
+  const output = await codemods.makeUsingStub(stubsRoot, 'migration.stub', {
     entity: {
       filename: `${Date.now()}${MIGRATION_SUFFIX}`,
     },
   })
+
+  /**
+   * The stub renderer trims the final newline, which prettier reports
+   */
+  if (output.status !== 'skipped' && !output.contents.endsWith('\n')) {
+    appendFileSync(output.destination, '\n')
+  }
 }
 
 function getSourceFile(project: Project, path: string): SourceFile {

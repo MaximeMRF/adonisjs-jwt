@@ -9,6 +9,7 @@ import { generateKeyPairSync } from 'node:crypto'
 import { TEST_SECRET, SHORT_SECRET } from './helpers.js'
 import jwt from 'jsonwebtoken'
 import type { JwtGuardUser } from '../src/types.js'
+import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 
 test.group('JWT Drivers', () => {
   test('SymmetricDriver should throw error if secret is missing', ({ assert }) => {
@@ -147,6 +148,39 @@ test.group('JWT Drivers', () => {
     const { token } = await guard.generate(user!.getOriginal())
     const payload = jwt.decode(token) as Record<string, any>
     assert.equal(payload.email, user!.getOriginal().email)
+  })
+
+  test('generate() types refreshToken after refreshTokenUserProvider', async ({ assert }) => {
+    const { jwtGuard } = await import('../src/define_config.js')
+    const userProvider = new JwtFakeUserProvider()
+    const fakeApp = {} as any
+    const ctx = new HttpContextFactory().create()
+
+    const withRefreshTokens = await jwtGuard({
+      provider: userProvider,
+      secret: TEST_SECRET,
+      refreshTokenUserProvider: {} as AccessTokensUserProviderContract<unknown>,
+    }).resolver('jwt', fakeApp)
+    const withoutRefreshTokens = await jwtGuard({
+      provider: userProvider,
+      secret: TEST_SECRET,
+    }).resolver('jwt', fakeApp)
+
+    const guard = withRefreshTokens(ctx)
+    const guardWithout = withoutRefreshTokens(ctx)
+
+    /**
+     * Checked by the typecheck: the values only exist at the type level
+     */
+    type Result<T extends (...args: any[]) => Promise<any>> = Awaited<ReturnType<T>>
+    const generated: string = ({} as Result<typeof guard.generate>).refreshToken
+    const refreshed: string = ({} as Result<typeof guard.generateWithRefreshToken>).refreshToken
+    // @ts-expect-error without refreshTokenUserProvider, refreshToken may be undefined
+    const missing: string = ({} as Result<typeof guardWithout.generate>).refreshToken
+
+    assert.isUndefined(generated)
+    assert.isUndefined(refreshed)
+    assert.isUndefined(missing)
   })
 
   test('jwtGuard config provider should resolve asymmetric driver and jwks driver', async ({

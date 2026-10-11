@@ -82,13 +82,15 @@ export const ALLOWED_JWKS_ALGORITHMS = [
 
 export type JwtJwksAlgorithm = (typeof ALLOWED_JWKS_ALGORITHMS)[number]
 
-export type JwtGenerateResult = {
+/**
+ * `refreshToken` is a string when the guard has a `refreshTokenUserProvider`
+ */
+export type JwtGenerateResult<WithRefreshToken extends boolean = boolean> = {
   type: string
   token: string
   expiresIn?: number | StringValue
-  refreshToken?: string
   refreshTokenExpiresIn?: number | StringValue
-}
+} & ([WithRefreshToken] extends [true] ? { refreshToken: string } : { refreshToken?: string })
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
   /**
