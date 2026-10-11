@@ -2,6 +2,8 @@
 
 Services running in a Kubernetes cluster can authenticate against your API with their ServiceAccount token, without any shared secret. The API server signs these tokens and publishes its public keys, so the guard can verify them in [JWKS](/guide/jwks) mode.
 
+![The kubelet mounts a projected token in the client pod, which sends it to the AdonisJS API. The guard verifies it with the API server's public keys. A default token is rejected with a 401.](/k8s-architecture.png)
+
 ## Configure the guard
 
 The Kubernetes API server exposes its signing keys at `https://kubernetes.default.svc/openid/v1/jwks`. From inside the cluster, fetching them requires the cluster CA and a ServiceAccount token, which you can provide with a custom `jwks-rsa` `fetcher`. The token is read again on each fetch because projected tokens are rotated:
