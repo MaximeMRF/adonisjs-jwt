@@ -240,7 +240,7 @@ jwt: jwtGuard({
 
 ### Check other claims
 
-Some providers don't put your application in the `aud` claim. Amazon Cognito access tokens, for example, carry the app client in `client_id` and have no `aud`. Use `verifyPayload` to check those claims: it receives the verified payload before the user lookup, and the request is rejected when it returns `false`. In JWKS mode, it can replace `audience`:
+Some providers don't put your application in the `aud` claim. Amazon Cognito access tokens, for example, carry the app client in `client_id` and have no `aud`. Use `verifyPayload` to check those claims: it receives the verified payload before the user lookup, and the token is accepted only when it returns `true`. Any other value (a claim, a string, `undefined`…) or an exception rejects it. In JWKS mode, it can replace `audience`:
 
 ```typescript
 jwt: jwtGuard({
