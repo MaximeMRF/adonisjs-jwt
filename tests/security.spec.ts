@@ -622,3 +622,39 @@ test.group('Security | clockTolerance', () => {
       }
     })
 })
+
+test.group('Security | revoke with a forged refresh token', () => {
+  test('revoke ignores a refresh token with a valid id and a wrong secret', async ({ assert }) => {
+    const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const created = await User.refreshTokens.create(user)
+    const forged = `rt_${Buffer.from(String(created.identifier)).toString('base64url')}.${Buffer.from('forged-secret').toString('base64url')}`
+
+    const ctx = new HttpContextFactory().create()
+    ctx.request.setInitialBody({ refreshToken: forged })
+    const attacker = new JwtGuard(ctx, new JwtFakeUserProvider(), {
+      secret: TEST_SECRET,
+      refreshTokenUserProvider,
+    })
+    await attacker.revoke()
+
+    assert.isNotNull(await User.refreshTokens.verify(created.value!))
+    const victim = new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+      secret: TEST_SECRET,
+      refreshTokenUserProvider,
+    })
+    assert.exists(await victim.generateWithRefreshToken(created.value!.release()))
+  })
+
+  test('revoke still deletes a valid refresh token', async ({ assert }) => {
+    const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const created = await User.refreshTokens.create(user)
+
+    const guard = new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+      secret: TEST_SECRET,
+      refreshTokenUserProvider,
+    })
+    await guard.revoke(created.value!.release())
+
+    assert.isNull(await User.refreshTokens.verify(created.value!))
+  })
+})
