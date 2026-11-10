@@ -378,7 +378,17 @@ export class JwtGuard<
       }
     }
 
-    await this.#refreshTokenUserProvider.invalidateToken(new Secret(refreshToken))
+    /**
+     * Only delete a refresh token whose secret is valid. The tokens
+     * provider deletes by id alone, so a forged token with a guessed
+     * id would otherwise revoke another user's refresh token.
+     */
+    const secret = new Secret(refreshToken)
+    if (!(await this.#refreshTokenUserProvider.verifyToken(secret))) {
+      return
+    }
+
+    await this.#refreshTokenUserProvider.invalidateToken(secret)
   }
 
   /**
