@@ -27,7 +27,7 @@ Some providers put the same generic audience in every token of a realm, for exam
 
 ## Check other claims
 
-`verifyPayload` runs on the verified payload, before the user is looked up. Return `false` to reject the token. It can be async.
+`verifyPayload` runs on the verified payload, before the user is looked up. The token is accepted only when it returns `true`: any other value (a claim, a string, `undefined`…) or an exception rejects it. It can be async.
 
 Use it to check claims that `issuer` and `audience` don't cover, for example a scope or a tenant:
 

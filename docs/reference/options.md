@@ -28,7 +28,7 @@ Default: `(payload) => payload.userId`. Use `(payload) => payload.sub` for token
 
 ### verifyPayload
 
-`(payload) => boolean | Promise<boolean>`. Extra check on a verified payload, run before `getUserId`. Return `false` to reject the token.
+`(payload) => boolean | Promise<boolean>`. Extra check on a verified payload, run before `getUserId`. Only an explicit `true` accepts the token: any other value, or an exception, rejects it.
 
 Default: none. In JWKS mode, it can replace `audience`, see [Check other claims](/guide/jwks#check-other-claims).
 
