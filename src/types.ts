@@ -162,7 +162,8 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   getUserId?: JwtGetUserId
   /**
    * Extra check on a verified token payload, run before looking up the user.
-   * Return `false` to reject the token. Use it to check claims other than
+   * Only an explicit `true` accepts the token: any other value, or an
+   * exception, rejects it. Use it to check claims other than
    * `iss` and `aud`, e.g. `client_id` and `token_use` for Amazon Cognito.
    */
   verifyPayload?: JwtVerifyPayload

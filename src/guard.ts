@@ -213,10 +213,22 @@ export class JwtGuard<
       })
     }
 
-    if (this.#options.verifyPayload && !(await this.#options.verifyPayload(payload))) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
+    if (this.#options.verifyPayload) {
+      /**
+       * Only an explicit `true` accepts the token: a truthy value such as
+       * a claim or an error message must not let it through. A callback
+       * that throws rejects the token instead of failing the request.
+       */
+      let isValid: unknown = false
+      try {
+        isValid = await this.#options.verifyPayload(payload)
+      } catch {}
+
+      if (isValid !== true) {
+        throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+          guardDriverName: this.driverName,
+        })
+      }
     }
 
     const getUserId = this.#options.getUserId ?? ((claims) => claims.userId)

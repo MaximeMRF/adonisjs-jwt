@@ -658,3 +658,50 @@ test.group('Security | revoke with a forged refresh token', () => {
     assert.isNull(await User.refreshTokens.verify(created.value!))
   })
 })
+
+test.group('Security | verifyPayload accepts only true', () => {
+  async function authenticateWithVerifyPayload(
+    verifyPayload: (payload: Record<string, any>) => any
+  ) {
+    const userProvider = new JwtFakeUserProvider()
+    const signer = new JwtGuard(new HttpContextFactory().create(), userProvider, {
+      secret: TEST_SECRET,
+    })
+    const { token } = await signer.generate((await userProvider.findById(1))!.getOriginal())
+
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    return new JwtGuard(ctx, userProvider, { secret: TEST_SECRET, verifyPayload }).authenticate()
+  }
+
+  test('reject the token when verifyPayload returns {case}')
+    .with([
+      { case: 'a non-empty string', verifyPayload: () => 'wrong client' },
+      { case: 'a claim value', verifyPayload: (p: Record<string, any>) => p.userId },
+      { case: 'an object', verifyPayload: () => ({}) },
+      { case: 'undefined', verifyPayload: () => undefined },
+      { case: 'a promise resolving to false', verifyPayload: async () => false },
+      { case: 'a promise resolving to a string', verifyPayload: async () => 'yes' },
+    ])
+    .run(async ({ assert }, { verifyPayload }) => {
+      await assert.rejects(
+        () => authenticateWithVerifyPayload(verifyPayload),
+        'Unauthorized access'
+      )
+    })
+
+  test('reject the token with a 401 when verifyPayload throws', async ({ assert }) => {
+    try {
+      await authenticateWithVerifyPayload((p) => p.missing.claim === 'x')
+      assert.fail('authenticate should have thrown')
+    } catch (error) {
+      assert.equal(error.code, 'E_UNAUTHORIZED_ACCESS')
+      assert.equal(error.status, 401)
+    }
+  })
+
+  test('accept the token when verifyPayload resolves to true', async ({ assert }) => {
+    const user = await authenticateWithVerifyPayload(async () => true)
+    assert.equal(user.id, 1)
+  })
+})
