@@ -4,7 +4,7 @@ The access token and the refresh token can travel in the `Authorization` header,
 
 ## Which transport to pick
 
-- **Browsers**: use cookies. They are `HttpOnly`, so JavaScript can't read them and an XSS can't steal the tokens.
+- **Browsers**: use cookies. They are `HttpOnly`, so JavaScript can't read them. Don't return the tokens in the response body as well, see [Single-page apps](/guide/spa#cookie-mode).
 - **Mobile apps, CLIs, other services**: send the access token in the `Authorization` header, and the refresh token in the request body or the `Authorization` header.
 
 ## Access token
@@ -68,9 +68,18 @@ jwtGuard({
 
 `maxAge` and `expires` can't be set: the guard derives them from `tokenExpiresIn` and `refreshTokenExpiresIn`. The same options apply to both cookies.
 
-::: tip CSRF
-Browsers send cookies automatically, including on requests triggered by other sites. Use `sameSite: 'strict'` or `'lax'`, or enable the [CSRF protection](https://docs.adonisjs.com/guides/security/securing-ssr-applications#csrf-protection) of AdonisJS, when you authenticate with cookies.
-:::
+Options that you don't set come from `http.cookie` in `config/app.ts` (`sameSite: 'lax'` and `path: '/'` in new apps). The cookies are signed with the application key, not encrypted: they can't be forged, and they are `HttpOnly`, but the JWT inside is readable by anyone who gets the cookie, like any JWT.
+
+Use `secure: app.inProduction` if you develop over plain HTTP on another hostname than `localhost`.
+
+## CSRF
+
+Browsers send cookies automatically, including on requests triggered by other sites. When you authenticate with cookies, protect the routes that change data:
+
+- **`sameSite: 'lax'` or `'strict'`** stops other sites from sending the cookies with their `POST` requests. `lax` still sends them on top-level `GET` navigations, so `GET` routes must not change data. `SameSite` works per site, not per origin: another subdomain of your domain, for example one that hosts user content, is the same site.
+- **The [CSRF protection](https://docs.adonisjs.com/guides/security/securing-ssr-applications#csrf-protection) of `@adonisjs/shield`** (with `@adonisjs/session`) adds a token check. Inertia forms send the token automatically. A SPA reads the `XSRF-TOKEN` cookie and sends it back in the `X-XSRF-TOKEN` header (axios does it by default). By default, Shield answers an invalid token with a redirect back, not a `403`: handle `E_BAD_CSRF_TOKEN` in your exception handler if your API clients need a status code.
+
+The CSRF protection applies to every `POST` route, including those used by mobile apps or other services that send the token in the `Authorization` header and have no CSRF token. Exclude them with `exceptRoutes`, and authenticate them with a second JWT guard without cookies, so that a cookie can't authenticate a request on a route that Shield no longer protects.
 
 ## Logging
 

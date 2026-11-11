@@ -29,6 +29,8 @@ export default defineConfig({
         items: [
           { text: 'Refresh tokens', link: '/guide/refresh-tokens' },
           { text: 'Cookies and token transport', link: '/guide/token-transport' },
+          { text: 'Single-page apps', link: '/guide/spa' },
+          { text: 'Inertia and server-rendered apps', link: '/guide/inertia' },
           { text: 'Asymmetric signing', link: '/guide/asymmetric' },
           { text: 'JWKS', link: '/guide/jwks' },
           { text: 'FerrisKey', link: '/guide/ferriskey' },
