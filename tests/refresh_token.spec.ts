@@ -1,4 +1,5 @@
 import { errors } from '@adonisjs/auth'
+import { RuntimeException } from '@adonisjs/core/exceptions'
 import { test } from '@japa/runner'
 import { JwtGuard } from '../src/guard.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
@@ -309,9 +310,12 @@ test('revoke should throw error when provider is not defined', async ({ assert }
     secret: TEST_SECRET,
   })
 
-  await assert.rejects(async () => {
-    await guard.revoke('some-token')
-  }, 'Unauthorized access')
+  // a configuration mistake is a 500, not a 401 sent to the client
+  await assert.rejects(
+    () => guard.revoke('some-token'),
+    'Refresh tokens are not configured: set `refreshTokenUserProvider` in the JWT guard config'
+  )
+  await assert.rejects(() => guard.revoke('some-token'), RuntimeException)
 })
 
 test('revoke should throw when no refresh token is sent', async ({ assert }) => {

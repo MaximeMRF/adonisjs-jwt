@@ -1,7 +1,9 @@
 import { symbols, errors } from '@adonisjs/auth'
+import { RuntimeException } from '@adonisjs/core/exceptions'
 import type { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
 import {
+  DEFAULT_REFRESH_TOKEN_EXPIRES_IN,
   DEFAULT_TOKEN_EXPIRES_IN,
   type JwtUserProviderContract,
   type JwtGuardOptions,
@@ -11,7 +13,7 @@ import {
 import { Secret } from '@adonisjs/core/helpers'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { JwtDriver } from './drivers/types.js'
-import { validateGuardOptions } from './validation.js'
+import { releaseSecrets, validateGuardOptions, type ReleasedSecrets } from './validation.js'
 import { resolveDriver } from './driver_resolver.js'
 import { installJwtUnauthorizedRenderer } from './errors.js'
 
@@ -26,7 +28,7 @@ export class JwtGuard<
   #refreshTokenUserProvider?: AccessTokensUserProviderContract<
     UserProvider[typeof symbols.PROVIDER_REAL_USER]
   >
-  #options: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
+  #options: ReleasedSecrets<JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>>
   #tokenName: string
   #refreshTokenName: string = 'refreshToken'
   #driver: JwtDriver
@@ -45,7 +47,10 @@ export class JwtGuard<
   ) {
     this.#ctx = ctx
     this.#userProvider = userProvider
-    this.#options = option
+    /**
+     * Copy the options: the defaults below must not leak into the caller's object
+     */
+    this.#options = releaseSecrets({ ...option })
     this.#refreshTokenUserProvider = this.#options.refreshTokenUserProvider
     if (!this.#options.content) this.#options.content = (user) => ({ userId: user.getId() })
     this.#tokenName = this.#options.tokenName ?? 'token'
@@ -54,14 +59,22 @@ export class JwtGuard<
      * Never issue access tokens without an expiration
      */
     this.#options.tokenExpiresIn = this.#options.tokenExpiresIn ?? DEFAULT_TOKEN_EXPIRES_IN
+    /**
+     * Give refresh tokens a lifetime, so the database row, the cookie and
+     * the response always agree
+     */
+    if (this.#refreshTokenUserProvider) {
+      this.#options.refreshTokenExpiresIn =
+        this.#options.refreshTokenExpiresIn ?? DEFAULT_REFRESH_TOKEN_EXPIRES_IN
+    }
     this.#cookieOptions = {
       httpOnly: true,
       secure: true,
       ...this.#options.cookie,
     }
 
-    validateGuardOptions(this.#options, 'JwtGuard')
-    this.#driver = resolveDriver(this.#options, 'JwtGuard')
+    validateGuardOptions(this.#options, 'JWT guard')
+    this.#driver = resolveDriver(this.#options, 'JWT guard')
   }
 
   #signAccessToken(payload: Record<string, any>) {
@@ -130,9 +143,9 @@ export class JwtGuard<
     user: UserProvider[typeof symbols.PROVIDER_REAL_USER]
   ): Promise<JwtGenerateResult<WithRefreshToken>> {
     if (!this.#driver.canSign) {
-      throw new errors.E_UNAUTHORIZED_ACCESS("You can't use the auth.generate method with jwks", {
-        guardDriverName: this.driverName,
-      })
+      throw new RuntimeException(
+        'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+      )
     }
     const providerUser = await this.#userProvider.createUserForGuard(user)
 
@@ -246,9 +259,16 @@ export class JwtGuard<
       }
     }
 
-    const getUserId = this.#options.getUserId ?? ((claims) => claims.userId)
-    const userId = getUserId(payload)
-    if (userId === undefined || userId === null) {
+    /**
+     * A `getUserId` that throws, or a claim of an unexpected type (an object
+     * or an array from an identity provider), rejects the token instead of
+     * failing the request or reaching the database
+     */
+    let userId: unknown
+    try {
+      userId = (this.#options.getUserId ?? ((claims) => claims.userId))(payload)
+    } catch {}
+    if (!isUserId(userId)) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })
@@ -276,15 +296,13 @@ export class JwtGuard<
     this.authenticationAttempted = true
 
     if (!this.#driver.canSign) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('JWKS is not supported for refresh token', {
-        guardDriverName: this.driverName,
-      })
+      throw new RuntimeException(
+        'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+      )
     }
 
     if (!this.#refreshTokenUserProvider) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
+      throw new RuntimeException(REFRESH_TOKENS_NOT_CONFIGURED)
     }
 
     if (!refreshToken) {
@@ -397,9 +415,7 @@ export class JwtGuard<
    */
   async revoke(refreshToken?: string): Promise<void> {
     if (!this.#refreshTokenUserProvider) {
-      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
-        guardDriverName: this.driverName,
-      })
+      throw new RuntimeException(REFRESH_TOKENS_NOT_CONFIGURED)
     }
 
     this.#clearCookies()
@@ -444,8 +460,13 @@ export class JwtGuard<
     try {
       await this.authenticate()
       return true
-    } catch {
-      return false
+    } catch (error) {
+      /**
+       * Like the official guards, only an authentication failure means
+       * "not logged in": a database outage must not look like a guest
+       */
+      if (error instanceof errors.E_UNAUTHORIZED_ACCESS) return false
+      throw error
     }
   }
 
@@ -476,4 +497,15 @@ export class JwtGuard<
       },
     }
   }
+}
+
+const REFRESH_TOKENS_NOT_CONFIGURED =
+  'Refresh tokens are not configured: set `refreshTokenUserProvider` in the JWT guard config'
+
+function isUserId(value: unknown): value is string | number | bigint {
+  return (
+    (typeof value === 'string' && value !== '') ||
+    (typeof value === 'number' && Number.isFinite(value)) ||
+    typeof value === 'bigint'
+  )
 }

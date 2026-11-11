@@ -1,7 +1,10 @@
 import ms from 'ms'
 import type { JwtGuardOptions } from './types.js'
 
-export function validateGuardOptions(options: JwtGuardOptions, prefix: string = 'JwtGuard') {
+export function validateGuardOptions(
+  options: ReleasedSecrets<JwtGuardOptions>,
+  prefix: string = 'JWT guard'
+) {
   validateLifetimes(options, prefix)
 
   if (options.driver) {
@@ -66,7 +69,7 @@ function assertDuration(value: unknown, name: string, prefix: string) {
 /**
  * Exactly one signing method: a secret, an asymmetric key pair, or a JWKS endpoint
  */
-export function validateSigningMethod(options: JwtGuardOptions, prefix: string) {
+export function validateSigningMethod(options: ReleasedSecrets<JwtGuardOptions>, prefix: string) {
   const asymmetricPartial =
     options.privateKey !== undefined ||
     options.publicKey !== undefined ||
@@ -91,6 +94,34 @@ export function validateSigningMethod(options: JwtGuardOptions, prefix: string) 
     throw new Error(`${prefix} \`verifyPayload\` must be a function`)
   }
 
+  if (options.jwks && options.refreshTokenUserProvider) {
+    throw new Error(
+      `${prefix} cannot use refresh tokens with \`jwks\`: tokens are issued by the identity provider, remove \`refreshTokenUserProvider\``
+    )
+  }
+
+  if (options.secret !== undefined && typeof options.secret !== 'string') {
+    throw new Error(`${prefix} \`secret\` must be a string or a Secret`)
+  }
+
+  /**
+   * In JWKS mode, the driver checks them with its own message. Elsewhere,
+   * an empty value is signed into every token, then rejects all of them.
+   */
+  if (!options.jwks) {
+    if (options.issuer !== undefined && !isNonEmptyString(options.issuer)) {
+      throw new Error(`${prefix} \`issuer\` must be a non-empty string`)
+    }
+    if (
+      options.audience !== undefined &&
+      !(Array.isArray(options.audience)
+        ? options.audience.length > 0 && options.audience.every(isNonEmptyString)
+        : isNonEmptyString(options.audience))
+    ) {
+      throw new Error(`${prefix} \`audience\` must be a non-empty string or array of strings`)
+    }
+  }
+
   if (options.jwks && usesAsymmetric) {
     throw new Error(
       `${prefix} cannot use \`jwks\` together with asymmetric \`privateKey\` / \`publicKey\``
@@ -109,4 +140,32 @@ export function validateSigningMethod(options: JwtGuardOptions, prefix: string) 
       `${prefix} requires \`secret\` (symmetric), or \`privateKey\` + \`publicKey\` + \`algorithm\` (asymmetric), or \`jwks\``
     )
   }
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== ''
+}
+
+/**
+ * Accept `Secret` values (`Env.schema.secret()` in AdonisJS v7) for the
+ * signing keys, and work with their string value
+ */
+export type ReleasedSecrets<Options> = Options extends any
+  ? Omit<Options, 'secret' | 'privateKey'> & { secret?: string; privateKey?: string }
+  : never
+
+export function releaseSecrets<Options extends { secret?: unknown; privateKey?: unknown }>(
+  options: Options
+): ReleasedSecrets<Options> {
+  return {
+    ...options,
+    ...(options.secret !== undefined ? { secret: release(options.secret) } : {}),
+    ...(options.privateKey !== undefined ? { privateKey: release(options.privateKey) } : {}),
+  } as unknown as ReleasedSecrets<Options>
+}
+
+function release(value: unknown) {
+  return value && typeof (value as { release?: unknown }).release === 'function'
+    ? (value as { release(): unknown }).release()
+    : value
 }

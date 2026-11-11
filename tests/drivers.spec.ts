@@ -66,7 +66,7 @@ test.group('JWT Drivers', () => {
     )
     assert.throws(
       () => driver.sign({ userId: 1 }),
-      "You can't use the auth.generate method with jwks"
+      'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
     )
   })
 

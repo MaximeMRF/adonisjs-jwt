@@ -151,7 +151,7 @@ test.group('Jwt guard | validation and error cases', () => {
             jwksUri: 'http://localhost/jwks',
           },
         }),
-      'JwtGuard cannot use `jwks` together with asymmetric `privateKey` / `publicKey`'
+      'JWT guard cannot use `jwks` together with asymmetric `privateKey` / `publicKey`'
     )
   })
 
@@ -161,7 +161,7 @@ test.group('Jwt guard | validation and error cases', () => {
 
     assert.throws(
       () => new JwtGuard(ctx, userProvider, {} as any),
-      'JwtGuard requires `secret` (symmetric), or `privateKey` + `publicKey` + `algorithm` (asymmetric), or `jwks`'
+      'JWT guard requires `secret` (symmetric), or `privateKey` + `publicKey` + `algorithm` (asymmetric), or `jwks`'
     )
   })
 
@@ -226,7 +226,7 @@ test.group('Jwt guard | validation and error cases', () => {
           publicKey: 'invalid-public-key',
           algorithm: 'RS256',
         }),
-      /JwtGuard asymmetric key validation failed/
+      /JWT guard asymmetric key validation failed/
     )
   })
 })

@@ -10,6 +10,7 @@ import { installJwtUnauthorizedRenderer } from '../src/errors.js'
 import { DbAccessTokensProvider, tokensUserProvider } from '@adonisjs/auth/access_tokens'
 import { createDatabase, createTables, signCookie, timeTravel, TEST_SECRET } from './helpers.js'
 import { Secret } from '@adonisjs/core/helpers'
+import { RuntimeException } from '@adonisjs/core/exceptions'
 import jwt from 'jsonwebtoken'
 import nock from 'nock'
 import crypto from 'node:crypto'
@@ -83,7 +84,7 @@ test.group('Security | access token lifetime', () => {
 
       assert.throws(
         () => new JwtGuard(ctx, userProvider, { secret: TEST_SECRET, tokenExpiresIn: value }),
-        'JwtGuard `tokenExpiresIn` must be a positive number of seconds'
+        'JWT guard `tokenExpiresIn` must be a positive number of seconds'
       )
     })
 
@@ -813,7 +814,7 @@ test.group('Security | the configuration is validated at startup', (group) => {
           secret: TEST_SECRET,
           tokenExpiresIn: '-1h',
         }),
-      /^JwtGuard `tokenExpiresIn` must be a duration of at least 1 second/
+      /^JWT guard `tokenExpiresIn` must be a duration of at least 1 second/
     )
   })
 
@@ -1121,4 +1122,349 @@ test.group('Security | verifyPayload must be a function', () => {
         'JWT guard `verifyPayload` must be a function'
       )
     })
+})
+
+test.group('Security | check() only hides authentication failures', () => {
+  class DatabaseDownProvider extends JwtFakeUserProvider {
+    async findById(): Promise<never> {
+      throw new Error('database is down')
+    }
+  }
+
+  test('a database outage is rethrown instead of looking like a guest', async ({ assert }) => {
+    const token = jwt.sign({ userId: 1 }, TEST_SECRET, { expiresIn: '1h' })
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    const guard = new JwtGuard(ctx, new DatabaseDownProvider(), { secret: TEST_SECRET })
+
+    await assert.rejects(() => guard.check(), 'database is down')
+  })
+
+  test('an invalid token still makes check() return false', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.authorization = 'Bearer not-a-jwt'
+    const guard = new JwtGuard(ctx, new DatabaseDownProvider(), { secret: TEST_SECRET })
+
+    assert.isFalse(await guard.check())
+  })
+})
+
+test.group('Security | the user id taken from the token', () => {
+  class SpyProvider extends JwtFakeUserProvider {
+    ids: unknown[] = []
+    async findById(id: any) {
+      this.ids.push(id)
+      return super.findById(Number(id))
+    }
+  }
+
+  async function authenticateWithUserId(getUserId: (claims: Record<string, any>) => any) {
+    const provider = new SpyProvider()
+    const token = jwt.sign({ userId: 1, sub: '1' }, TEST_SECRET, { expiresIn: '1h' })
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    const guard = new JwtGuard(ctx, provider, { secret: TEST_SECRET, getUserId })
+    const result = await Promise.allSettled([guard.authenticate()])
+    return { provider, result: result[0]! }
+  }
+
+  test('reject the token with a 401 when getUserId returns {case}')
+    .with([
+      { case: 'an object', getUserId: () => ({ id: 1 }) },
+      { case: 'an array', getUserId: () => [1] },
+      { case: 'an empty string', getUserId: () => '' },
+      { case: 'NaN', getUserId: () => Number.NaN },
+      { case: 'Infinity', getUserId: () => Number.POSITIVE_INFINITY },
+      { case: 'a boolean', getUserId: () => true },
+      { case: 'null', getUserId: () => null },
+      { case: 'undefined', getUserId: () => undefined },
+    ])
+    .run(async ({ assert }, { getUserId }) => {
+      const { provider, result } = await authenticateWithUserId(getUserId)
+
+      assert.equal(result.status, 'rejected')
+      if (result.status === 'rejected') {
+        assert.instanceOf(result.reason, errors.E_UNAUTHORIZED_ACCESS)
+      }
+      // the database is never queried with an unexpected value
+      assert.deepEqual(provider.ids, [])
+    })
+
+  test('reject the token with a 401 when getUserId throws', async ({ assert }) => {
+    const { provider, result } = await authenticateWithUserId(() => {
+      throw new TypeError("Cannot read properties of undefined (reading 'id')")
+    })
+
+    assert.equal(result.status, 'rejected')
+    if (result.status === 'rejected') {
+      assert.instanceOf(result.reason, errors.E_UNAUTHORIZED_ACCESS)
+    }
+    assert.deepEqual(provider.ids, [])
+  })
+
+  test('accept a user id that is {case}')
+    .with([
+      { case: 'a number', getUserId: (claims: Record<string, any>) => claims.userId, id: 1 },
+      { case: 'a string', getUserId: (claims: Record<string, any>) => claims.sub, id: '1' },
+      { case: 'a bigint', getUserId: (claims: Record<string, any>) => BigInt(claims.sub), id: 1n },
+    ])
+    .run(async ({ assert }, { getUserId, id }) => {
+      const { provider, result } = await authenticateWithUserId(getUserId)
+
+      assert.equal(result.status, 'fulfilled')
+      assert.deepEqual(provider.ids, [id])
+    })
+})
+
+test.group('Security | misuses are server errors, not 401s', (group) => {
+  group.each.teardown(() => {
+    nock.cleanAll()
+  })
+
+  const REFRESH_NOT_CONFIGURED =
+    'Refresh tokens are not configured: set `refreshTokenUserProvider` in the JWT guard config'
+  const NO_SIGNING_IN_JWKS =
+    'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+
+  function jwksGuard() {
+    const driver = new JwksDriver(
+      { jwksUri: 'https://misuse.example.com/.well-known/jwks.json' },
+      { issuer: 'idp', audience: 'api' }
+    )
+    return new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), { driver })
+  }
+
+  function guardWithoutRefreshTokens() {
+    return new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+      secret: TEST_SECRET,
+    })
+  }
+
+  test('{case}')
+    .with([
+      {
+        case: 'generate() in JWKS mode',
+        call: () => jwksGuard().generate({ id: 1, email: 'a@b.c', password: 'x' }),
+        message: NO_SIGNING_IN_JWKS,
+      },
+      {
+        case: 'generateWithRefreshToken() in JWKS mode',
+        call: () => jwksGuard().generateWithRefreshToken('rt_whatever'),
+        message: NO_SIGNING_IN_JWKS,
+      },
+      {
+        case: 'generateWithRefreshToken() without refreshTokenUserProvider',
+        call: () => guardWithoutRefreshTokens().generateWithRefreshToken('rt_whatever'),
+        message: REFRESH_NOT_CONFIGURED,
+      },
+      {
+        case: 'revoke() without refreshTokenUserProvider',
+        call: () => guardWithoutRefreshTokens().revoke('rt_whatever'),
+        message: REFRESH_NOT_CONFIGURED,
+      },
+    ])
+    .run(async ({ assert }, { call, message }) => {
+      const [result] = await Promise.allSettled([call()])
+
+      assert.equal(result!.status, 'rejected')
+      if (result!.status === 'rejected') {
+        assert.instanceOf(result!.reason, RuntimeException)
+        assert.notInstanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+        assert.equal(result!.reason.message, message)
+      }
+    })
+})
+
+test.group('Security | Secret values for the signing keys', () => {
+  test('accept a Secret as the symmetric secret', async ({ assert }) => {
+    const userProvider = new JwtFakeUserProvider()
+    const signer = new JwtGuard(new HttpContextFactory().create(), userProvider, {
+      secret: new Secret(TEST_SECRET),
+    })
+    const { token } = await signer.generate((await userProvider.findById(1))!.getOriginal())
+
+    // signed with the released value, not with "[redacted]"
+    const guard = await authenticateWith({ secret: TEST_SECRET }, token)
+    assert.equal(guard.user!.id, 1)
+  })
+
+  test('accept a Secret as the private key', async ({ assert }) => {
+    const options = asymmetricGuardOptions('RS256')
+    const userProvider = new JwtFakeUserProvider()
+    const signer = new JwtGuard(new HttpContextFactory().create(), userProvider, {
+      ...options,
+      privateKey: new Secret(options.privateKey),
+    })
+    const { token } = await signer.generate((await userProvider.findById(1))!.getOriginal())
+
+    const guard = await authenticateWith(options, token)
+    assert.equal(guard.user!.id, 1)
+  })
+
+  test('jwtGuard() checks the length of a Secret on its released value', ({ assert }) => {
+    assert.doesNotThrow(() =>
+      jwtGuard({ provider: new JwtFakeUserProvider(), secret: new Secret(TEST_SECRET) })
+    )
+    assert.throws(
+      () => jwtGuard({ provider: new JwtFakeUserProvider(), secret: new Secret('too-short') }),
+      /at least 32 characters/
+    )
+  })
+
+  test('throw at startup when the secret is {case}')
+    .with([
+      { case: 'a number', secret: 12345678901234567890123456789012345 },
+      { case: 'an object without release()', secret: { value: TEST_SECRET } },
+    ])
+    .run(({ assert }, { secret }) => {
+      assert.throws(
+        () =>
+          new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+            secret: secret as any,
+          }),
+        'JWT guard `secret` must be a string or a Secret'
+      )
+    })
+
+  test('the defaults are not written into the options object of the caller', ({ assert }) => {
+    const options = { secret: TEST_SECRET }
+    new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), options)
+
+    assert.deepEqual(options, { secret: TEST_SECRET })
+  })
+})
+
+test.group('Security | empty claims are rejected at startup', () => {
+  test('throw when {case} ({mode})')
+    .with(
+      (['symmetric', 'asymmetric'] as const).flatMap((mode) => [
+        {
+          mode,
+          case: "issuer: ''",
+          claims: { issuer: '' },
+          message: /`issuer` must be a non-empty string/,
+        },
+        {
+          mode,
+          case: "issuer: '  '",
+          claims: { issuer: '  ' },
+          message: /`issuer` must be a non-empty string/,
+        },
+        {
+          mode,
+          case: 'audience: []',
+          claims: { audience: [] },
+          message: /`audience` must be a non-empty/,
+        },
+        {
+          mode,
+          case: "audience: ''",
+          claims: { audience: '' },
+          message: /`audience` must be a non-empty/,
+        },
+        {
+          mode,
+          case: "audience: ['api', '']",
+          claims: { audience: ['api', ''] },
+          message: /`audience` must be a non-empty/,
+        },
+      ])
+    )
+    .run(({ assert }, { mode, claims, message }) => {
+      const keys = mode === 'symmetric' ? { secret: TEST_SECRET } : asymmetricGuardOptions('ES256')
+      assert.throws(
+        () =>
+          new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+            ...keys,
+            ...(claims as any),
+          }),
+        message
+      )
+    })
+
+  test('accept a non-empty issuer and audience', ({ assert }) => {
+    assert.doesNotThrow(
+      () =>
+        new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+          secret: TEST_SECRET,
+          issuer: 'my-app',
+          audience: ['web', 'mobile'],
+        })
+    )
+  })
+
+  test('throw at startup when JWKS is combined with refresh tokens', async ({ assert }) => {
+    const { refreshTokenUserProvider } = await setupRefreshTokens()
+    assert.throws(
+      () =>
+        jwtGuard({
+          provider: new JwtFakeUserProvider(),
+          jwks: { jwksUri: 'https://idp.example.com/.well-known/jwks.json' },
+          issuer: 'idp',
+          audience: 'api',
+          refreshTokenUserProvider,
+        }),
+      /cannot use refresh tokens with `jwks`/
+    )
+  })
+})
+
+test.group('Security | refresh tokens expire after 7 days by default', () => {
+  test('the database row, the cookie and the response agree', async ({ assert }) => {
+    const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const ctx = new HttpContextFactory().create()
+    const guard = new JwtGuard(ctx, new JwtFakeUserProvider(), {
+      secret: TEST_SECRET,
+      useCookies: true,
+      useCookiesForRefreshToken: true,
+      refreshTokenUserProvider,
+    })
+
+    const before = Date.now()
+    const { refreshTokenExpiresIn } = await guard.generate(user)
+    const sevenDays = 7 * 24 * 60 * 60
+
+    assert.equal(refreshTokenExpiresIn, '7d')
+
+    const [row] = await User.refreshTokens.all(user)
+    const lifetime = (row!.expiresAt!.getTime() - before) / 1000
+    assert.closeTo(lifetime, sevenDays, 60)
+
+    const setCookie = ([] as string[]).concat(ctx.response.getHeader('set-cookie') as any)
+    const refreshCookie = setCookie.find((cookie) => cookie.startsWith('refreshToken='))
+    assert.include(refreshCookie, `Max-Age=${sevenDays}`)
+  })
+
+  test('a refresh token is rejected after 7 days', async ({ assert }) => {
+    const { user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const options = { secret: TEST_SECRET, refreshTokenUserProvider }
+    const { refreshToken } = await new JwtGuard(
+      new HttpContextFactory().create(),
+      new JwtFakeUserProvider(),
+      options
+    ).generate(user)
+
+    timeTravel(7 * 24 * 60 * 60 + 60)
+
+    await assert.rejects(
+      () =>
+        new JwtGuard(
+          new HttpContextFactory().create(),
+          new JwtFakeUserProvider(),
+          options
+        ).generateWithRefreshToken(refreshToken),
+      errors.E_UNAUTHORIZED_ACCESS
+    )
+  })
+
+  test('an explicit refreshTokenExpiresIn still wins', async ({ assert }) => {
+    const { user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const { refreshTokenExpiresIn } = await new JwtGuard(
+      new HttpContextFactory().create(),
+      new JwtFakeUserProvider(),
+      { secret: TEST_SECRET, refreshTokenExpiresIn: '30d', refreshTokenUserProvider }
+    ).generate(user)
+
+    assert.equal(refreshTokenExpiresIn, '30d')
+  })
 })

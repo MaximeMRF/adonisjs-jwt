@@ -1,3 +1,4 @@
+import { RuntimeException } from '@adonisjs/core/exceptions'
 import { test } from '@japa/runner'
 import { JwtGuard } from '../src/guard.js'
 import { type BaseJwtContent, type JwtGuardUser } from '../src/types.js'
@@ -81,7 +82,8 @@ test.group('Jwt guard | authenticate', () => {
     assert.equal(tokens?.type, 'bearer')
     assert.exists(tokens?.token)
     assert.exists(tokens?.refreshToken)
-    assert.isUndefined(tokens?.refreshTokenExpiresIn)
+    // refresh tokens get a lifetime by default
+    assert.equal(tokens?.refreshTokenExpiresIn, '7d')
 
     // The old refresh token should be gone/invalid
     assert.notEqual(tokens?.refreshToken, refreshToken.value?.release())
@@ -98,7 +100,9 @@ test.group('Jwt guard | authenticate', () => {
     const [result] = await Promise.allSettled([guard.generateWithRefreshToken()])
     assert.equal(result!.status, 'rejected')
     if (result!.status === 'rejected') {
-      assert.instanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
+      // a configuration mistake is a 500, not a 401 sent to the client
+      assert.instanceOf(result!.reason, RuntimeException)
+      assert.notInstanceOf(result!.reason, errors.E_UNAUTHORIZED_ACCESS)
     }
     assert.isUndefined(guard.user)
     assert.throws(() => guard.getUserOrFail(), 'Unauthorized access')

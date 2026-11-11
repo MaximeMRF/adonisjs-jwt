@@ -199,7 +199,7 @@ test.group('Jwt guard | JWKS', (group) => {
 
     await assert.rejects(async () => {
       await guard.generate(user!.getOriginal())
-    }, "You can't use the auth.generate method with jwks")
+    }, 'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider')
   })
 
   test('should throw error when calling generateWithRefreshToken with jwks enabled', async ({
@@ -216,7 +216,7 @@ test.group('Jwt guard | JWKS', (group) => {
 
     await assert.rejects(async () => {
       await guard.generateWithRefreshToken()
-    }, 'JWKS is not supported for refresh token')
+    }, 'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider')
   })
 
   test('should return the jwks client', async ({ assert }) => {
@@ -463,7 +463,7 @@ test.group('Jwt guard | JWKS', (group) => {
 
     assert.throws(
       () => new JwtGuard(ctx, userProvider, { secret: 'ignored', jwks, ...claims, algorithms: [] }),
-      'JwtGuard JWKS validation failed: `algorithms` must not be empty'
+      'JWT guard JWKS validation failed: `algorithms` must not be empty'
     )
     assert.throws(
       () =>
@@ -473,7 +473,7 @@ test.group('Jwt guard | JWKS', (group) => {
           ...claims,
           algorithms: ['HS256' as any],
         }),
-      /JwtGuard JWKS validation failed: unsupported algorithm\(s\): HS256/
+      /JWT guard JWKS validation failed: unsupported algorithm\(s\): HS256/
     )
   })
 

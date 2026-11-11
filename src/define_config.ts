@@ -17,7 +17,7 @@ import type { ApplicationService } from '@adonisjs/core/types'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
-import { validateLifetimes, validateSigningMethod } from './validation.js'
+import { releaseSecrets, validateLifetimes, validateSigningMethod } from './validation.js'
 import type { JwtDriver } from './drivers/types.js'
 import { resolveDriver } from './driver_resolver.js'
 import { hkdfSync } from 'node:crypto'
@@ -36,8 +36,8 @@ export function jwtGuard<
   useCookies?: boolean
   useCookiesForRefreshToken?: boolean
   refreshTokenAbilities?: string[]
-  secret?: string
-  privateKey?: string
+  secret?: string | Secret<string>
+  privateKey?: string | Secret<string>
   publicKey?: string
   algorithm?: JwtAsymmetricAlgorithm
   content?: (
@@ -68,7 +68,7 @@ export function jwtGuard<
    */
   const usesAppKey = config.secret === undefined && !usesAsymmetric && !config.jwks
 
-  const options = {
+  const options = releaseSecrets({
     ...(usesAsymmetric ? asymmetricKeys : { secret: config.secret }),
     refreshTokenUserProvider: config.refreshTokenUserProvider,
     tokenName: config.tokenName,
@@ -87,7 +87,7 @@ export function jwtGuard<
     clockTolerance: config.clockTolerance,
     getUserId: config.getUserId,
     verifyPayload: config.verifyPayload,
-  }
+  })
 
   /**
    * Validate the configuration when config/auth.ts is loaded, so a bad
