@@ -83,6 +83,14 @@ export function validateSigningMethod(options: JwtGuardOptions, prefix: string) 
     )
   }
 
+  /**
+   * A falsy `verifyPayload` (`null`, `false`) must not count as a payload
+   * check: in JWKS mode it would replace the required `audience`
+   */
+  if (options.verifyPayload !== undefined && typeof options.verifyPayload !== 'function') {
+    throw new Error(`${prefix} \`verifyPayload\` must be a function`)
+  }
+
   if (options.jwks && usesAsymmetric) {
     throw new Error(
       `${prefix} cannot use \`jwks\` together with asymmetric \`privateKey\` / \`publicKey\``

@@ -384,7 +384,7 @@ test.group('Jwt guard | authenticate', () => {
     const userProvider = new JwtFakeUserProvider()
 
     const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
-    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 1 }, TEST_SECRET)}`
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 1 }, TEST_SECRET, { expiresIn: '1h' })}`
 
     const authenticatedUser = await guard.authenticate()
 
@@ -403,7 +403,7 @@ test.group('Jwt guard | authenticate', () => {
       secret: TEST_SECRET,
       useCookies: true,
     })
-    const token = jwt.sign({ userId: 1 }, TEST_SECRET)
+    const token = jwt.sign({ userId: 1 }, TEST_SECRET, { expiresIn: '1h' })
     ctx.request.request.headers.cookie = `token=${signCookie('token', token)}`
 
     const authenticatedUser = await guard.authenticate()
@@ -426,7 +426,7 @@ test.group('Jwt guard | authenticate', () => {
       useCookies: true,
       tokenName: 'custom',
     })
-    const token = jwt.sign({ userId: 1 }, TEST_SECRET)
+    const token = jwt.sign({ userId: 1 }, TEST_SECRET, { expiresIn: '1h' })
     ctx.request.request.headers.cookie = `custom=${signCookie('custom', token)}`
 
     const authenticatedUser = await guard.authenticate()
@@ -448,7 +448,7 @@ test.group('Jwt guard | authenticate', () => {
     const guard = new JwtGuard(ctx, userProvider, {
       secret: mySecret,
     })
-    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 1 }, mySecret)}`
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 1 }, mySecret, { expiresIn: '1h' })}`
 
     const authenticatedUser = await guard.authenticate()
 
@@ -497,7 +497,7 @@ test.group('Jwt guard | authenticate', () => {
     const userProvider = new JwtFakeUserProvider()
     const ctx = new HttpContextFactory().create()
     const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
-    const token = jwt.sign({ foo: 'bar' }, TEST_SECRET)
+    const token = jwt.sign({ foo: 'bar' }, TEST_SECRET, { expiresIn: '1h' })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
     const [result] = await Promise.allSettled([guard.authenticate()])
@@ -517,12 +517,12 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
 
-    const tokenNull = jwt.sign({ userId: null }, TEST_SECRET)
+    const tokenNull = jwt.sign({ userId: null }, TEST_SECRET, { expiresIn: '1h' })
     ctx.request.request.headers.authorization = `Bearer ${tokenNull}`
     const [resultNull] = await Promise.allSettled([guard.authenticate()])
     assert.equal(resultNull!.status, 'rejected')
 
-    const tokenUndefined = jwt.sign({ userId: undefined }, TEST_SECRET)
+    const tokenUndefined = jwt.sign({ userId: undefined }, TEST_SECRET, { expiresIn: '1h' })
     ctx.request.request.headers.authorization = `Bearer ${tokenUndefined}`
     const [resultUndefined] = await Promise.allSettled([guard.authenticate()])
     assert.equal(resultUndefined!.status, 'rejected')
@@ -552,7 +552,7 @@ test.group('Jwt guard | authenticate', () => {
     const ctx = new HttpContextFactory().create()
     const userProvider = new JwtFakeUserProvider()
     const guard = new JwtGuard(ctx, userProvider, { secret: TEST_SECRET })
-    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 999 }, TEST_SECRET)}`
+    ctx.request.request.headers.authorization = `Bearer ${jwt.sign({ userId: 999 }, TEST_SECRET, { expiresIn: '1h' })}`
     const [result] = await Promise.allSettled([guard.authenticate()])
 
     assert.equal(result!.status, 'rejected')
@@ -901,7 +901,10 @@ test.group('Jwt guard | issuer and audience validation', () => {
       issuer: 'expected-issuer',
     })
 
-    const invalidToken = jwt.sign({ userId: 1 }, TEST_SECRET, { issuer: 'wrong-issuer' })
+    const invalidToken = jwt.sign({ userId: 1 }, TEST_SECRET, {
+      expiresIn: '1h',
+      issuer: 'wrong-issuer',
+    })
     ctx.request.request.headers.authorization = `Bearer ${invalidToken}`
 
     await assert.rejects(async () => await guard.authenticate(), /Unauthorized access/)
@@ -916,7 +919,10 @@ test.group('Jwt guard | issuer and audience validation', () => {
       audience: 'expected-audience',
     })
 
-    const invalidToken = jwt.sign({ userId: 1 }, TEST_SECRET, { audience: 'wrong-audience' })
+    const invalidToken = jwt.sign({ userId: 1 }, TEST_SECRET, {
+      expiresIn: '1h',
+      audience: 'wrong-audience',
+    })
     ctx.request.request.headers.authorization = `Bearer ${invalidToken}`
 
     await assert.rejects(async () => await guard.authenticate(), /Unauthorized access/)

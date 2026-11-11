@@ -77,7 +77,7 @@ test.group('JWT Drivers', () => {
     const mockDriver = {
       canSign: true,
       sign: () => 'mocked-token',
-      verify: () => ({ userId: 1 }),
+      verify: () => ({ userId: 1, exp: Math.floor(Date.now() / 1000) + 60 }),
     }
 
     const guard = new JwtGuard(ctx, userProvider, {

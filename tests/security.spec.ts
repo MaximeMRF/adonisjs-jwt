@@ -259,6 +259,7 @@ test.group('Security | JWKS', (group) => {
     for (let i = 0; i < 25; i++) {
       const kid = crypto.randomUUID()
       const token = jwt.sign({ userId: 1 }, privateKey, {
+        expiresIn: '1h',
         algorithm: 'RS256',
         keyid: kid,
         ...claims,
@@ -1044,4 +1045,80 @@ test.group('Security | revoke only succeeds when a refresh token is revoked', ()
     assert.isNull(await User.refreshTokens.verify(new Secret(oldRefreshToken)))
     assert.isNull(await User.refreshTokens.verify(new Secret(newRefreshToken)))
   })
+})
+
+test.group('Security | tokens without exp are rejected', (group) => {
+  group.each.teardown(() => {
+    nock.cleanAll()
+  })
+
+  test('symmetric driver: a validly signed token without exp is rejected', async ({ assert }) => {
+    // NO_EXP: e.g. issued by another service that shares the secret
+    const token = jwt.sign({ userId: 1, iat: 1 }, TEST_SECRET)
+
+    await assert.rejects(
+      () => authenticateWith({ secret: TEST_SECRET }, token),
+      errors.E_UNAUTHORIZED_ACCESS
+    )
+  })
+
+  test('{algorithm}: a validly signed token without exp is rejected')
+    .with([{ algorithm: 'RS256' as const }, { algorithm: 'ES256' as const }])
+    .run(async ({ assert }, { algorithm }) => {
+      const options = asymmetricGuardOptions(algorithm)
+      // NO_EXP
+      const token = jwt.sign({ userId: 1 }, options.privateKey, { algorithm })
+
+      await assert.rejects(() => authenticateWith(options, token), errors.E_UNAUTHORIZED_ACCESS)
+    })
+
+  test('JWKS: a token without exp from the identity provider is rejected', async ({ assert }) => {
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    })
+    const jwk = { ...crypto.createPublicKey(publicKey).export({ format: 'jwk' }), kid: 'k1' }
+    nock('https://no-exp.example.com')
+      .persist()
+      .get('/.well-known/jwks.json')
+      .reply(200, { keys: [jwk] })
+
+    const claims = { issuer: 'idp', audience: 'api' }
+    const driver = new JwksDriver(
+      { jwksUri: 'https://no-exp.example.com/.well-known/jwks.json' },
+      claims
+    )
+    const sign = (expiresIn?: '1h') =>
+      // NO_EXP when expiresIn is undefined
+      jwt.sign({ userId: 1 }, privateKey, {
+        algorithm: 'RS256',
+        keyid: 'k1',
+        ...claims,
+        ...(expiresIn ? { expiresIn } : {}),
+      })
+
+    // the same token with exp is accepted: the rejection comes from the missing exp
+    const guard = await authenticateWith({ driver }, sign('1h'))
+    assert.equal(guard.user!.id, 1)
+    await assert.rejects(() => authenticateWith({ driver }, sign()), errors.E_UNAUTHORIZED_ACCESS)
+  })
+})
+
+test.group('Security | verifyPayload must be a function', () => {
+  test('throw at startup when verifyPayload is {value}')
+    .with([{ value: null }, { value: false }, { value: 'client_id' }])
+    .run(({ assert }, { value }) => {
+      // with JWKS, a falsy verifyPayload used to replace the required audience
+      assert.throws(
+        () =>
+          jwtGuard({
+            provider: new JwtFakeUserProvider(),
+            jwks: { jwksUri: 'https://idp.example.com/.well-known/jwks.json' },
+            issuer: 'idp',
+            verifyPayload: value as any,
+          }),
+        'JWT guard `verifyPayload` must be a function'
+      )
+    })
 })
