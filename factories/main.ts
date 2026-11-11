@@ -30,7 +30,7 @@ export class JwtFakeUserProvider implements JwtUserProviderContract<JwtAuthFakeU
     secret: string,
     options?: { expiresIn?: StringValue | number }
   ) {
-    return jwt.sign({ userId: user.id }, secret, options)
+    return jwt.sign({ userId: user.id }, secret, { expiresIn: '1h', ...options })
   }
 
   /**

@@ -217,7 +217,12 @@ export class JwtGuard<
       })
     }
 
-    if (!payload || typeof payload !== 'object') {
+    /**
+     * jsonwebtoken only checks `exp` when the claim is present: a token
+     * without it (issued by another service sharing the secret, or by an
+     * identity provider) would otherwise be valid forever
+     */
+    if (!payload || typeof payload !== 'object' || typeof payload.exp !== 'number') {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
       })

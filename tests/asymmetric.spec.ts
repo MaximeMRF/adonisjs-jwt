@@ -83,7 +83,7 @@ test.group('Jwt guard | asymmetric (RSA)', () => {
       algorithm: 'RS256',
     })
 
-    const hs256Token = jwt.sign({ userId: 1 }, 'symmetric-secret')
+    const hs256Token = jwt.sign({ userId: 1 }, 'symmetric-secret', { expiresIn: '1h' })
     ctx.request.request.headers.authorization = `Bearer ${hs256Token}`
 
     const [result] = await Promise.allSettled([guard.authenticate()])

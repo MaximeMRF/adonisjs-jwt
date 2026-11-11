@@ -37,7 +37,7 @@ export function resolveDriver(
         audience: options.audience,
         clockTolerance: options.clockTolerance,
         algorithms: options.algorithms,
-        verifiesPayload: options.verifyPayload !== undefined,
+        verifiesPayload: typeof options.verifyPayload === 'function',
       })
     } catch (error) {
       throw new Error(`${contextName} JWKS validation failed: ${(error as Error).message}`)

@@ -49,6 +49,7 @@ test.group('Jwt guard | JWKS', (group) => {
     })
 
     const token = jwt.sign({ userId: 1 }, privateKey, {
+      expiresIn: '1h',
       algorithm: 'RS256',
       keyid: kid,
       header: { kid, alg: 'RS256' },
@@ -81,6 +82,7 @@ test.group('Jwt guard | JWKS', (group) => {
     })
 
     const token = jwt.sign({ userId: 1 }, privateKey, {
+      expiresIn: '1h',
       algorithm: 'RS256',
       keyid: kid,
       header: { kid, alg: 'RS256' },
@@ -111,6 +113,7 @@ test.group('Jwt guard | JWKS', (group) => {
     })
 
     const token = jwt.sign({ userId: 1 }, privateKey, {
+      expiresIn: '1h',
       algorithm: 'RS256',
       keyid: kid,
       header: { kid, alg: 'RS256' },
@@ -143,6 +146,7 @@ test.group('Jwt guard | JWKS', (group) => {
 
     // Sign with a kid that definitely doesn't match the one in JWK
     const token = jwt.sign({ userId: 1 }, privateKey, {
+      expiresIn: '1h',
       algorithm: 'RS256',
       keyid: 'other-kid',
       header: { kid: 'other-kid', alg: 'RS256' },
@@ -170,6 +174,7 @@ test.group('Jwt guard | JWKS', (group) => {
     })
 
     const token = jwt.sign({ userId: 1 }, privateKey, {
+      expiresIn: '1h',
       algorithm: 'RS256',
       ...claims,
     })
@@ -245,6 +250,7 @@ test.group('Jwt guard | JWKS', (group) => {
 
     // Sign with HS256 using the public key string as secret key (Algorithm Confusion Attack)
     const forgedToken = jwt.sign({ userId: 1 }, publicKey, {
+      expiresIn: '1h',
       algorithm: 'HS256',
       header: { kid, alg: 'HS256' },
       ...claims,
@@ -305,6 +311,7 @@ test.group('Jwt guard | JWKS', (group) => {
 
     // Shaped like an external IdP / Kubernetes ServiceAccount token: no userId claim
     const token = jwt.sign({ sub: '1' }, privateKey, {
+      expiresIn: '1h',
       algorithm: 'RS256',
       keyid: kid,
       issuer: 'https://kubernetes.default.svc.cluster.local',
@@ -335,7 +342,12 @@ test.group('Jwt guard | JWKS', (group) => {
       getUserId: (payload) => payload.sub,
     })
 
-    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid, ...claims })
+    const token = jwt.sign({ userId: 1 }, privateKey, {
+      expiresIn: '1h',
+      algorithm: 'RS256',
+      keyid: kid,
+      ...claims,
+    })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
 
@@ -358,6 +370,7 @@ test.group('Jwt guard | JWKS', (group) => {
     const guardFor = (cognitoClaims: Record<string, any>) => {
       const ctx = new HttpContextFactory().create()
       const token = jwt.sign({ sub: '1', ...cognitoClaims }, privateKey, {
+        expiresIn: '1h',
         algorithm: 'RS256',
         keyid: kid,
         issuer,
@@ -400,7 +413,12 @@ test.group('Jwt guard | JWKS', (group) => {
       algorithms: ['PS256'],
     })
 
-    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid, ...claims })
+    const token = jwt.sign({ userId: 1 }, privateKey, {
+      expiresIn: '1h',
+      algorithm: 'RS256',
+      keyid: kid,
+      ...claims,
+    })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
 
@@ -425,7 +443,12 @@ test.group('Jwt guard | JWKS', (group) => {
       algorithms: ['RS256'],
     })
 
-    const token = jwt.sign({ userId: 1 }, privateKey, { algorithm: 'RS256', keyid: kid, ...claims })
+    const token = jwt.sign({ userId: 1 }, privateKey, {
+      expiresIn: '1h',
+      algorithm: 'RS256',
+      keyid: kid,
+      ...claims,
+    })
 
     ctx.request.request.headers.authorization = `Bearer ${token}`
 
@@ -478,6 +501,7 @@ test.group('Jwt guard | JWKS', (group) => {
       })
 
       const token = jwt.sign({ userId: 1 }, privateKey, {
+        expiresIn: '1h',
         algorithm: 'RS256',
         keyid: kid,
         ...signOptions,
