@@ -13,6 +13,9 @@ import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/acce
 import type { JwtDriver } from './drivers/types.js'
 import { validateGuardOptions } from './validation.js'
 import { resolveDriver } from './driver_resolver.js'
+import { installJwtUnauthorizedRenderer } from './errors.js'
+
+installJwtUnauthorizedRenderer()
 
 export class JwtGuard<
   UserProvider extends JwtUserProviderContract<unknown>,
@@ -28,6 +31,12 @@ export class JwtGuard<
   #refreshTokenName: string = 'refreshToken'
   #driver: JwtDriver
   #cookieOptions?: JwtCookieOptions | undefined
+  /**
+   * Refresh token issued during the current request, by `generate()` or a
+   * refresh. A logout in the same request revokes it: the request still
+   * carries the previous one, which the refresh has already deleted.
+   */
+  #issuedRefreshToken?: string
 
   constructor(
     ctx: HttpContext,
@@ -142,6 +151,7 @@ export class JwtGuard<
           : undefined
       )
       refreshToken = generatedRefreshToken.value!.release()
+      this.#issuedRefreshToken = refreshToken
     }
 
     if (this.#options.useCookies) {
@@ -371,9 +381,16 @@ export class JwtGuard<
   }
 
   /**
-   * Revoke the refresh token
+   * Revoke the refresh token passed as argument, or else the one issued
+   * during this request, or else the one sent by the client (cookie, body
+   * or Authorization header).
+   *
+   * The cookies are always cleared. When no valid refresh token is found,
+   * nothing is revoked and `E_UNAUTHORIZED_ACCESS` is raised, so a client
+   * that sends the wrong token (e.g. its access token) does not believe it
+   * has logged out while its refresh token stays valid.
    */
-  async revoke(refreshToken?: string) {
+  async revoke(refreshToken?: string): Promise<void> {
     if (!this.#refreshTokenUserProvider) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,
@@ -382,13 +399,7 @@ export class JwtGuard<
 
     this.#clearCookies()
 
-    if (!refreshToken) {
-      try {
-        refreshToken = await this.#findRefreshToken()
-      } catch {
-        return
-      }
-    }
+    refreshToken = refreshToken ?? this.#issuedRefreshToken ?? (await this.#findRefreshToken())
 
     /**
      * Only delete a refresh token whose secret is valid. The tokens
@@ -396,11 +407,16 @@ export class JwtGuard<
      * id would otherwise revoke another user's refresh token.
      */
     const secret = new Secret(refreshToken)
-    if (!(await this.#refreshTokenUserProvider.verifyToken(secret))) {
-      return
+    if (
+      !(await this.#refreshTokenUserProvider.verifyToken(secret)) ||
+      !(await this.#refreshTokenUserProvider.invalidateToken(secret))
+    ) {
+      throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+        guardDriverName: this.driverName,
+      })
     }
 
-    await this.#refreshTokenUserProvider.invalidateToken(secret)
+    if (refreshToken === this.#issuedRefreshToken) this.#issuedRefreshToken = undefined
   }
 
   /**

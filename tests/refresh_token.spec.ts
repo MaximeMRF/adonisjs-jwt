@@ -1,3 +1,4 @@
+import { errors } from '@adonisjs/auth'
 import { test } from '@japa/runner'
 import { JwtGuard } from '../src/guard.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
@@ -313,7 +314,7 @@ test('revoke should throw error when provider is not defined', async ({ assert }
   }, 'Unauthorized access')
 })
 
-test('revoke should return silently when token not found', async ({ assert }) => {
+test('revoke should throw when no refresh token is sent', async ({ assert }) => {
   const ctx = new HttpContextFactory().create()
   const userProvider = new JwtFakeUserProvider()
 
@@ -328,9 +329,7 @@ test('revoke should return silently when token not found', async ({ assert }) =>
     }) as any,
   })
 
-  // Should not throw
-  await guard.revoke()
-  assert.isTrue(true)
+  await assert.rejects(() => guard.revoke(), errors.E_UNAUTHORIZED_ACCESS)
 })
 
 test('generateWithRefreshToken should fail when invalidateToken fails', async ({ assert }) => {
