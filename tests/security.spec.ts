@@ -5,7 +5,8 @@ import { jwtGuard } from '../src/define_config.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
-import { errors } from '@adonisjs/auth'
+import { AuthManager, errors } from '@adonisjs/auth'
+import { installJwtUnauthorizedRenderer } from '../src/errors.js'
 import { DbAccessTokensProvider, tokensUserProvider } from '@adonisjs/auth/access_tokens'
 import { createDatabase, createTables, signCookie, timeTravel, TEST_SECRET } from './helpers.js'
 import { Secret } from '@adonisjs/core/helpers'
@@ -283,7 +284,12 @@ test.group('Security | refresh tokens', () => {
       refreshTokenUserProvider,
     })
 
-    await assert.rejects(() => guard.revoke(), errors.E_UNAUTHORIZED_ACCESS)
+    ctx.request.request.headers.accept = 'application/json'
+    const error = await guard.revoke().catch((e) => e)
+    assert.instanceOf(error, errors.E_UNAUTHORIZED_ACCESS)
+    // the 401 rendered by the exception handler keeps the cookies cleared
+    await error.handle(error, ctx)
+    assert.equal(ctx.response.getStatus(), 401)
 
     const setCookie = ctx.response.getHeader('set-cookie') as string[]
     assert.isArray(setCookie)
@@ -722,7 +728,13 @@ test.group('Security | the configuration is validated at startup', (group) => {
       { case: "tokenExpiresIn: '-1h'", options: { tokenExpiresIn: '-1h' } },
       { case: "tokenExpiresIn: 'abc'", options: { tokenExpiresIn: 'abc' } },
       { case: "tokenExpiresIn: '0s'", options: { tokenExpiresIn: '0s' } },
-      { case: "tokenExpiresIn: '500ms'", options: { tokenExpiresIn: '500ms' } },
+      { case: "tokenExpiresIn: '999ms'", options: { tokenExpiresIn: '999ms' } },
+      { case: 'tokenExpiresIn: Infinity', options: { tokenExpiresIn: Number.POSITIVE_INFINITY } },
+      { case: 'tokenExpiresIn: true', options: { tokenExpiresIn: true } },
+      {
+        case: "refreshTokenExpiresIn: '604800' (no unit)",
+        options: { refreshTokenExpiresIn: '604800' },
+      },
       { case: "tokenExpiresIn: '3600' (no unit)", options: { tokenExpiresIn: '3600' } },
       { case: 'tokenExpiresIn: -60', options: { tokenExpiresIn: -60 } },
       { case: "refreshTokenExpiresIn: '-7d'", options: { refreshTokenExpiresIn: '-7d' } },
@@ -744,7 +756,9 @@ test.group('Security | the configuration is validated at startup', (group) => {
 
   test('accept {case}')
     .with([
+      { case: "tokenExpiresIn: '1s' (the minimum)", options: { tokenExpiresIn: '1s' } },
       { case: "tokenExpiresIn: '15m'", options: { tokenExpiresIn: '15m' } },
+      { case: "tokenExpiresIn: '1.5h'", options: { tokenExpiresIn: '1.5h' } },
       { case: 'tokenExpiresIn: 900', options: { tokenExpiresIn: 900 } },
       { case: "refreshTokenExpiresIn: '7d'", options: { refreshTokenExpiresIn: '7d' } },
       { case: 'clockTolerance: 0', options: { clockTolerance: 0 } },
@@ -772,16 +786,33 @@ test.group('Security | the configuration is validated at startup', (group) => {
     )
   })
 
-  test('throw when JWKS is used without jwksUri', ({ assert }) => {
+  test('throw when JWKS is used with {case}')
+    .with([
+      { case: 'no jwksUri', jwks: {} },
+      { case: 'an empty jwksUri', jwks: { jwksUri: '' } },
+      { case: 'a blank jwksUri', jwks: { jwksUri: '   ' } },
+    ])
+    .run(({ assert }, { jwks }) => {
+      assert.throws(
+        () =>
+          jwtGuard({
+            provider: new JwtFakeUserProvider(),
+            jwks: jwks as any,
+            issuer: 'jwks-issuer',
+            audience: 'jwks-audience',
+          }),
+        'JWT guard `jwks.jwksUri` is required to fetch the identity provider keys'
+      )
+    })
+
+  test('a guard created without jwtGuard() validates the lifetimes too', ({ assert }) => {
     assert.throws(
       () =>
-        jwtGuard({
-          provider: new JwtFakeUserProvider(),
-          jwks: {} as any,
-          issuer: 'jwks-issuer',
-          audience: 'jwks-audience',
+        new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+          secret: TEST_SECRET,
+          tokenExpiresIn: '-1h',
         }),
-      'JWT guard `jwks.jwksUri` is required to fetch the identity provider keys'
+      /^JwtGuard `tokenExpiresIn` must be a duration of at least 1 second/
     )
   })
 
@@ -833,12 +864,16 @@ test.group('Security | 401 responses', () => {
     })
   })
 
-  test('HTML requests without a login route get a plain text 401', async ({ assert }) => {
-    const response = await render('text/html')
+  test('without a login route, a client sending Accept: {accept} gets a 401, not a redirect')
+    .with([{ accept: '*/*' }, { accept: 'text/html' }])
+    .run(async ({ assert }, { accept }) => {
+      // curl and most HTTP clients send */*, which negotiates as HTML
+      const response = await render(accept)
 
-    assert.equal(response.getStatus(), 401)
-    assert.equal(response.getBody(), 'Unauthorized access')
-  })
+      assert.equal(response.getStatus(), 401)
+      assert.equal(response.getBody(), 'Unauthorized access')
+      assert.isUndefined(response.getHeader('location'))
+    })
 
   test('HTML requests (pages, Inertia visits) are redirected to the login route', async ({
     assert,
@@ -854,6 +889,62 @@ test.group('Security | 401 responses', () => {
 
     assert.equal(response.getStatus(), 401)
     assert.deepEqual(response.getBody(), { errors: [{ message: 'Unauthorized access' }] })
+  })
+
+  async function authenticateThroughMiddleware(accept: string, loginRoute?: string) {
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.accept = accept
+    const manager = new AuthManager({
+      default: 'jwt',
+      guards: {
+        jwt: (c) => new JwtGuard(c, new JwtFakeUserProvider(), { secret: TEST_SECRET }),
+      },
+    })
+
+    // what the starter kits' auth middleware does
+    const error = await manager
+      .createAuthenticator(ctx)
+      .authenticateUsing(['jwt'], loginRoute ? { loginRoute } : undefined)
+      .catch((e) => e)
+    if (!(error instanceof errors.E_UNAUTHORIZED_ACCESS)) {
+      throw new Error('authenticateUsing should have raised E_UNAUTHORIZED_ACCESS')
+    }
+    await error.handle(error, ctx)
+    return ctx.response
+  }
+
+  test('auth middleware with a login route (Inertia kit): a page visit is redirected', async ({
+    assert,
+  }) => {
+    const response = await authenticateThroughMiddleware(
+      'text/html, application/xhtml+xml',
+      '/login'
+    )
+
+    assert.equal(response.getStatus(), 302)
+    assert.equal(response.getHeader('location'), '/login')
+  })
+
+  test('auth middleware with a login route: a fetch() from the same app still gets JSON', async ({
+    assert,
+  }) => {
+    const response = await authenticateThroughMiddleware('application/json', '/login')
+
+    assert.equal(response.getStatus(), 401)
+    assert.deepEqual(response.getBody(), { errors: [{ message: 'Unauthorized access' }] })
+  })
+
+  test('auth middleware without a login route (API kit): JSON 401', async ({ assert }) => {
+    const response = await authenticateThroughMiddleware('application/json')
+
+    assert.equal(response.getStatus(), 401)
+    assert.deepEqual(response.getBody(), { errors: [{ message: 'Unauthorized access' }] })
+  })
+
+  test('installing the renderer twice does not wrap the handler twice', ({ assert }) => {
+    const handle = errors.E_UNAUTHORIZED_ACCESS.prototype.handle
+    installJwtUnauthorizedRenderer()
+    assert.strictEqual(errors.E_UNAUTHORIZED_ACCESS.prototype.handle, handle)
   })
 
   test('a 401 raised by the guard is rendered as JSON', async ({ assert }) => {
