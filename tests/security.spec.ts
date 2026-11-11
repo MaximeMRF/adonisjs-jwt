@@ -5,6 +5,7 @@ import { jwtGuard } from '../src/define_config.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
+import { errors } from '@adonisjs/auth'
 import { DbAccessTokensProvider, tokensUserProvider } from '@adonisjs/auth/access_tokens'
 import { createDatabase, createTables, timeTravel, TEST_SECRET } from './helpers.js'
 import jwt from 'jsonwebtoken'
@@ -691,13 +692,11 @@ test.group('Security | verifyPayload accepts only true', () => {
     })
 
   test('reject the token with a 401 when verifyPayload throws', async ({ assert }) => {
-    try {
-      await authenticateWithVerifyPayload((p) => p.missing.claim === 'x')
-      assert.fail('authenticate should have thrown')
-    } catch (error: any) {
-      assert.equal(error.code, 'E_UNAUTHORIZED_ACCESS')
-      assert.equal(error.status, 401)
-    }
+    // E_UNAUTHORIZED_ACCESS is a 401, the TypeError raised by verifyPayload would be a 500
+    await assert.rejects(
+      () => authenticateWithVerifyPayload((p) => p.missing.claim === 'x'),
+      errors.E_UNAUTHORIZED_ACCESS
+    )
   })
 
   test('accept the token when verifyPayload resolves to true', async ({ assert }) => {
