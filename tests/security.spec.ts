@@ -694,7 +694,7 @@ test.group('Security | verifyPayload accepts only true', () => {
     try {
       await authenticateWithVerifyPayload((p) => p.missing.claim === 'x')
       assert.fail('authenticate should have thrown')
-    } catch (error) {
+    } catch (error: any) {
       assert.equal(error.code, 'E_UNAUTHORIZED_ACCESS')
       assert.equal(error.status, 401)
     }
