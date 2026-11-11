@@ -42,7 +42,7 @@ jwtGuard({
 })
 ```
 
-It defaults to `1h`, so access tokens always expire. A number must be positive, otherwise the guard throws at startup. Keep it short and use [refresh tokens](/guide/refresh-tokens) to keep users logged in.
+It defaults to `1h`, so access tokens always expire. It must be a positive number of seconds, or a duration of at least 1 second with a unit (`'15m'`, `'7d'`), otherwise the app doesn't boot. A string without unit such as `'3600'`, typically read from an env variable, is rejected because it would be read as milliseconds: use `Number(env.get('JWT_TTL'))` or add a unit. The same rules apply to `refreshTokenExpiresIn`. Keep it short and use [refresh tokens](/guide/refresh-tokens) to keep users logged in.
 
 ## Token payload
 

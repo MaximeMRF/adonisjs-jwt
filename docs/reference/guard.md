@@ -50,7 +50,7 @@ Throws `E_UNAUTHORIZED_ACCESS` if the refresh token is missing, unknown, expired
 
 ### revoke(refreshToken?)
 
-Deletes the refresh token from the database and clears the cookies set by the guard. Reads the refresh token from the request when it isn't passed. Throws if refresh tokens are not configured.
+Deletes the refresh token from the database and clears the cookies set by the guard. When it isn't passed, revokes the refresh token issued earlier in the same request, or else reads it from the request. Throws `E_UNAUTHORIZED_ACCESS` if no valid refresh token is found (the cookies are cleared anyway), or if refresh tokens are not configured. See [Revoke a refresh token](/guide/refresh-tokens#revoke-a-refresh-token).
 
 ### authenticateAsClient(user)
 

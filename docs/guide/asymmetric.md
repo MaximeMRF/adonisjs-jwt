@@ -37,7 +37,7 @@ jwtGuard({
 
 The `.replace()` restores the line breaks of PEM keys stored on a single line in `.env`.
 
-The guard checks at startup that the keys are valid and match the algorithm. It throws if only some of the three options are set.
+The guard checks at startup that the keys are valid, match the algorithm, and belong to the same key pair. It throws if only some of the three options are set.
 
 Notes:
 

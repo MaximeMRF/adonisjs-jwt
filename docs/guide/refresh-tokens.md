@@ -160,7 +160,13 @@ router.post('logout', async ({ auth }) => {
 })
 ```
 
-It reads the refresh token like `generateWithRefreshToken()`, or accepts it as argument: `revoke(token)`. If the request carries no refresh token, it only clears the cookies.
+It accepts the refresh token as argument: `revoke(token)`. Otherwise it revokes the refresh token issued earlier in the same request, if any (for example by a middleware that refreshed an expired access token), or else reads it from the request like `generateWithRefreshToken()`.
+
+The cookies are always cleared. When no valid refresh token is found (none sent, unknown, already revoked), nothing is revoked and `revoke()` throws `E_UNAUTHORIZED_ACCESS`, so the client gets a `401` instead of believing it has logged out.
+
+::: warning Bearer clients
+A client that keeps its tokens in memory must send its **refresh token** on logout, in the body or the `Authorization` header. If it only sends its access token, the logout fails with a `401` and the refresh token stays valid.
+:::
 
 ::: warning
 Revoking a refresh token doesn't invalidate the access tokens already issued: they stay valid until they expire. Keep `tokenExpiresIn` short. See [Security](/guide/security#access-tokens-are-stateless).
