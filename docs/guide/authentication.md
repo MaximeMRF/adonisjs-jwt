@@ -66,7 +66,11 @@ GET /me HTTP/1.1
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-A missing, expired or invalid token is rejected with an `E_UNAUTHORIZED_ACCESS` error, which AdonisJS turns into a `401` response.
+A missing, expired or invalid token is rejected with an `E_UNAUTHORIZED_ACCESS` error, which AdonisJS turns into a `401` response. The response follows the `Accept` header of the request, like the built-in `access_tokens` guard:
+
+- JSON requests get `{ "errors": [{ "message": "Unauthorized access" }] }`.
+- JSON:API requests get `{ "errors": [{ "code": "E_UNAUTHORIZED_ACCESS", "title": "Unauthorized access" }] }`.
+- HTML requests, such as page loads and Inertia visits, are redirected to the login route when the `auth` middleware has one (`loginRoute`, set by the web and Inertia starter kits). Otherwise they get a plain text `401`.
 
 ## Optional authentication
 

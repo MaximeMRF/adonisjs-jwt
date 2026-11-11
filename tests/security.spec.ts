@@ -5,9 +5,11 @@ import { jwtGuard } from '../src/define_config.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
-import { errors } from '@adonisjs/auth'
+import { AuthManager, errors } from '@adonisjs/auth'
+import { installJwtUnauthorizedRenderer } from '../src/errors.js'
 import { DbAccessTokensProvider, tokensUserProvider } from '@adonisjs/auth/access_tokens'
-import { createDatabase, createTables, timeTravel, TEST_SECRET } from './helpers.js'
+import { createDatabase, createTables, signCookie, timeTravel, TEST_SECRET } from './helpers.js'
+import { Secret } from '@adonisjs/core/helpers'
 import jwt from 'jsonwebtoken'
 import nock from 'nock'
 import crypto from 'node:crypto'
@@ -85,14 +87,14 @@ test.group('Security | access token lifetime', () => {
       )
     })
 
-  test('throw at startup when tokenExpiresIn is not positive', async ({ assert }) => {
-    await assert.rejects(
+  test('throw at startup when tokenExpiresIn is not positive', ({ assert }) => {
+    assert.throws(
       () =>
         jwtGuard({
           provider: new JwtFakeUserProvider(),
           secret: TEST_SECRET,
           tokenExpiresIn: 0,
-        }).resolver('jwt', fakeApp(APP_KEY)),
+        }),
       'JWT guard `tokenExpiresIn` must be a positive number of seconds'
     )
   })
@@ -199,14 +201,14 @@ test.group('Security | JWKS', (group) => {
       { missing: 'issuer', options: { audience: 'jwks-audience' } },
       { missing: 'a non-empty audience', options: { issuer: 'jwks-issuer', audience: [] } },
     ])
-    .run(async ({ assert }, { options }) => {
-      await assert.rejects(
+    .run(({ assert }, { options }) => {
+      assert.throws(
         () =>
           jwtGuard({
             provider: new JwtFakeUserProvider(),
             jwks: { jwksUri },
             ...options,
-          }).resolver('jwt', fakeApp()),
+          }),
         /JWT guard JWKS validation failed: `issuer` and either `audience` or `verifyPayload` are required/
       )
     })
@@ -222,14 +224,14 @@ test.group('Security | JWKS', (group) => {
     assert.isFunction(resolver)
   })
 
-  test('still require issuer when verifyPayload is set', async ({ assert }) => {
-    await assert.rejects(
+  test('still require issuer when verifyPayload is set', ({ assert }) => {
+    assert.throws(
       () =>
         jwtGuard({
           provider: new JwtFakeUserProvider(),
           jwks: { jwksUri },
           verifyPayload: () => true,
-        }).resolver('jwt', fakeApp()),
+        }),
       /`issuer` and either `audience` or `verifyPayload` are required/
     )
   })
@@ -271,7 +273,7 @@ test.group('Security | JWKS', (group) => {
 })
 
 test.group('Security | refresh tokens', () => {
-  test('revoke clears the access and refresh token cookies', async ({ assert }) => {
+  test('revoke clears the cookies even when no refresh token is sent', async ({ assert }) => {
     const { refreshTokenUserProvider } = await setupRefreshTokens()
     const ctx = new HttpContextFactory().create()
 
@@ -282,7 +284,12 @@ test.group('Security | refresh tokens', () => {
       refreshTokenUserProvider,
     })
 
-    await guard.revoke()
+    ctx.request.request.headers.accept = 'application/json'
+    const error = await guard.revoke().catch((e) => e)
+    assert.instanceOf(error, errors.E_UNAUTHORIZED_ACCESS)
+    // the 401 rendered by the exception handler keeps the cookies cleared
+    await error.handle(error, ctx)
+    assert.equal(ctx.response.getStatus(), 401)
 
     const setCookie = ctx.response.getHeader('set-cookie') as string[]
     assert.isArray(setCookie)
@@ -299,7 +306,7 @@ test.group('Security | refresh tokens', () => {
       refreshTokenUserProvider,
     })
 
-    await guard.revoke()
+    await assert.rejects(() => guard.revoke(), errors.E_UNAUTHORIZED_ACCESS)
 
     assert.isUndefined(ctx.response.getHeader('set-cookie'))
   })
@@ -625,7 +632,7 @@ test.group('Security | clockTolerance', () => {
 })
 
 test.group('Security | revoke with a forged refresh token', () => {
-  test('revoke ignores a refresh token with a valid id and a wrong secret', async ({ assert }) => {
+  test('revoke rejects a refresh token with a valid id and a wrong secret', async ({ assert }) => {
     const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
     const created = await User.refreshTokens.create(user)
     const forged = `rt_${Buffer.from(String(created.identifier)).toString('base64url')}.${Buffer.from('forged-secret').toString('base64url')}`
@@ -636,7 +643,7 @@ test.group('Security | revoke with a forged refresh token', () => {
       secret: TEST_SECRET,
       refreshTokenUserProvider,
     })
-    await attacker.revoke()
+    await assert.rejects(() => attacker.revoke(), errors.E_UNAUTHORIZED_ACCESS)
 
     assert.isNotNull(await User.refreshTokens.verify(created.value!))
     const victim = new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
@@ -702,5 +709,339 @@ test.group('Security | verifyPayload accepts only true', () => {
   test('accept the token when verifyPayload resolves to true', async ({ assert }) => {
     const user = await authenticateWithVerifyPayload(async () => true)
     assert.equal(user.id, 1)
+  })
+})
+
+test.group('Security | the configuration is validated at startup', (group) => {
+  let previousAppKey: string | undefined
+  group.each.setup(() => {
+    previousAppKey = process.env.APP_KEY
+    delete process.env.APP_KEY
+  })
+  group.each.teardown(() => {
+    if (previousAppKey === undefined) delete process.env.APP_KEY
+    else process.env.APP_KEY = previousAppKey
+  })
+
+  test('throw when jwtGuard() is called with {case}')
+    .with([
+      { case: "tokenExpiresIn: '-1h'", options: { tokenExpiresIn: '-1h' } },
+      { case: "tokenExpiresIn: 'abc'", options: { tokenExpiresIn: 'abc' } },
+      { case: "tokenExpiresIn: '0s'", options: { tokenExpiresIn: '0s' } },
+      { case: "tokenExpiresIn: '999ms'", options: { tokenExpiresIn: '999ms' } },
+      { case: 'tokenExpiresIn: Infinity', options: { tokenExpiresIn: Number.POSITIVE_INFINITY } },
+      { case: 'tokenExpiresIn: true', options: { tokenExpiresIn: true } },
+      {
+        case: "refreshTokenExpiresIn: '604800' (no unit)",
+        options: { refreshTokenExpiresIn: '604800' },
+      },
+      { case: "tokenExpiresIn: '3600' (no unit)", options: { tokenExpiresIn: '3600' } },
+      { case: 'tokenExpiresIn: -60', options: { tokenExpiresIn: -60 } },
+      { case: "refreshTokenExpiresIn: '-7d'", options: { refreshTokenExpiresIn: '-7d' } },
+      { case: 'refreshTokenExpiresIn: 0', options: { refreshTokenExpiresIn: 0 } },
+      { case: 'clockTolerance: -30', options: { clockTolerance: -30 } },
+      { case: 'clockTolerance: NaN', options: { clockTolerance: Number.NaN } },
+    ])
+    .run(({ assert }, { options }) => {
+      assert.throws(
+        () =>
+          jwtGuard({
+            provider: new JwtFakeUserProvider(),
+            secret: TEST_SECRET,
+            ...(options as any),
+          }),
+        /^JWT guard `(tokenExpiresIn|refreshTokenExpiresIn|clockTolerance)`/
+      )
+    })
+
+  test('accept {case}')
+    .with([
+      { case: "tokenExpiresIn: '1s' (the minimum)", options: { tokenExpiresIn: '1s' } },
+      { case: "tokenExpiresIn: '15m'", options: { tokenExpiresIn: '15m' } },
+      { case: "tokenExpiresIn: '1.5h'", options: { tokenExpiresIn: '1.5h' } },
+      { case: 'tokenExpiresIn: 900', options: { tokenExpiresIn: 900 } },
+      { case: "refreshTokenExpiresIn: '7d'", options: { refreshTokenExpiresIn: '7d' } },
+      { case: 'clockTolerance: 0', options: { clockTolerance: 0 } },
+    ])
+    .run(({ assert }, { options }) => {
+      assert.doesNotThrow(() =>
+        jwtGuard({ provider: new JwtFakeUserProvider(), secret: TEST_SECRET, ...(options as any) })
+      )
+    })
+
+  test('throw when the secret is shorter than 32 characters', ({ assert }) => {
+    assert.throws(
+      () => jwtGuard({ provider: new JwtFakeUserProvider(), secret: 'my-short-secret' }),
+      /at least 32 characters/
+    )
+  })
+
+  test('throw when APP_KEY is shorter than 32 characters and no secret is configured', ({
+    assert,
+  }) => {
+    process.env.APP_KEY = 'short-app-key'
+    assert.throws(
+      () => jwtGuard({ provider: new JwtFakeUserProvider() }),
+      'JWT guard requires the application key (APP_KEY) to be at least 32 characters when no `secret` is configured'
+    )
+  })
+
+  test('throw when JWKS is used with {case}')
+    .with([
+      { case: 'no jwksUri', jwks: {} },
+      { case: 'an empty jwksUri', jwks: { jwksUri: '' } },
+      { case: 'a blank jwksUri', jwks: { jwksUri: '   ' } },
+    ])
+    .run(({ assert }, { jwks }) => {
+      assert.throws(
+        () =>
+          jwtGuard({
+            provider: new JwtFakeUserProvider(),
+            jwks: jwks as any,
+            issuer: 'jwks-issuer',
+            audience: 'jwks-audience',
+          }),
+        'JWT guard `jwks.jwksUri` is required to fetch the identity provider keys'
+      )
+    })
+
+  test('a guard created without jwtGuard() validates the lifetimes too', ({ assert }) => {
+    assert.throws(
+      () =>
+        new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+          secret: TEST_SECRET,
+          tokenExpiresIn: '-1h',
+        }),
+      /^JwtGuard `tokenExpiresIn` must be a duration of at least 1 second/
+    )
+  })
+
+  test('throw when the {algorithm} public key belongs to another key pair')
+    .with([{ algorithm: 'RS256' as const }, { algorithm: 'ES256' as const }])
+    .run(({ assert }, { algorithm }) => {
+      const { privateKey } = asymmetricGuardOptions(algorithm)
+      const { publicKey } = asymmetricGuardOptions(algorithm)
+
+      assert.throws(
+        () => jwtGuard({ provider: new JwtFakeUserProvider(), privateKey, publicKey, algorithm }),
+        'JWT guard asymmetric key validation failed: publicKey does not belong to the same key pair as privateKey'
+      )
+    })
+
+  test('accept a matching {algorithm} key pair')
+    .with([{ algorithm: 'RS256' as const }, { algorithm: 'ES256' as const }])
+    .run(({ assert }, { algorithm }) => {
+      const keys = asymmetricGuardOptions(algorithm)
+      assert.doesNotThrow(() => jwtGuard({ provider: new JwtFakeUserProvider(), ...keys }))
+    })
+})
+
+test.group('Security | 401 responses', () => {
+  async function render(accept: string, options: { redirectTo?: string } = {}) {
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.accept = accept
+    const error = new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+      guardDriverName: 'jwt',
+      ...options,
+    })
+    await error.handle(error, ctx)
+    return ctx.response
+  }
+
+  test('JSON requests get a JSON body, like the access_tokens guard', async ({ assert }) => {
+    const response = await render('application/json')
+
+    assert.equal(response.getStatus(), 401)
+    assert.deepEqual(response.getBody(), { errors: [{ message: 'Unauthorized access' }] })
+  })
+
+  test('JSON:API requests get a JSON:API body', async ({ assert }) => {
+    const response = await render('application/vnd.api+json')
+
+    assert.equal(response.getStatus(), 401)
+    assert.deepEqual(response.getBody(), {
+      errors: [{ code: 'E_UNAUTHORIZED_ACCESS', title: 'Unauthorized access' }],
+    })
+  })
+
+  test('without a login route, a client sending Accept: {accept} gets a 401, not a redirect')
+    .with([{ accept: '*/*' }, { accept: 'text/html' }])
+    .run(async ({ assert }, { accept }) => {
+      // curl and most HTTP clients send */*, which negotiates as HTML
+      const response = await render(accept)
+
+      assert.equal(response.getStatus(), 401)
+      assert.equal(response.getBody(), 'Unauthorized access')
+      assert.isUndefined(response.getHeader('location'))
+    })
+
+  test('HTML requests (pages, Inertia visits) are redirected to the login route', async ({
+    assert,
+  }) => {
+    const response = await render('text/html, application/xhtml+xml', { redirectTo: '/login' })
+
+    assert.equal(response.getStatus(), 302)
+    assert.equal(response.getHeader('location'), '/login')
+  })
+
+  test('JSON requests are not redirected even when there is a login route', async ({ assert }) => {
+    const response = await render('application/json', { redirectTo: '/login' })
+
+    assert.equal(response.getStatus(), 401)
+    assert.deepEqual(response.getBody(), { errors: [{ message: 'Unauthorized access' }] })
+  })
+
+  async function authenticateThroughMiddleware(accept: string, loginRoute?: string) {
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.accept = accept
+    const manager = new AuthManager({
+      default: 'jwt',
+      guards: {
+        jwt: (c) => new JwtGuard(c, new JwtFakeUserProvider(), { secret: TEST_SECRET }),
+      },
+    })
+
+    // what the starter kits' auth middleware does
+    const error = await manager
+      .createAuthenticator(ctx)
+      .authenticateUsing(['jwt'], loginRoute ? { loginRoute } : undefined)
+      .catch((e) => e)
+    if (!(error instanceof errors.E_UNAUTHORIZED_ACCESS)) {
+      throw new Error('authenticateUsing should have raised E_UNAUTHORIZED_ACCESS')
+    }
+    await error.handle(error, ctx)
+    return ctx.response
+  }
+
+  test('auth middleware with a login route (Inertia kit): a page visit is redirected', async ({
+    assert,
+  }) => {
+    const response = await authenticateThroughMiddleware(
+      'text/html, application/xhtml+xml',
+      '/login'
+    )
+
+    assert.equal(response.getStatus(), 302)
+    assert.equal(response.getHeader('location'), '/login')
+  })
+
+  test('auth middleware with a login route: a fetch() from the same app still gets JSON', async ({
+    assert,
+  }) => {
+    const response = await authenticateThroughMiddleware('application/json', '/login')
+
+    assert.equal(response.getStatus(), 401)
+    assert.deepEqual(response.getBody(), { errors: [{ message: 'Unauthorized access' }] })
+  })
+
+  test('auth middleware without a login route (API kit): JSON 401', async ({ assert }) => {
+    const response = await authenticateThroughMiddleware('application/json')
+
+    assert.equal(response.getStatus(), 401)
+    assert.deepEqual(response.getBody(), { errors: [{ message: 'Unauthorized access' }] })
+  })
+
+  test('installing the renderer twice does not wrap the handler twice', ({ assert }) => {
+    const handle = errors.E_UNAUTHORIZED_ACCESS.prototype.handle
+    installJwtUnauthorizedRenderer()
+    assert.strictEqual(errors.E_UNAUTHORIZED_ACCESS.prototype.handle, handle)
+  })
+
+  test('a 401 raised by the guard is rendered as JSON', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.accept = 'application/json'
+    ctx.request.request.headers.authorization = 'Bearer not-a-jwt'
+    const guard = new JwtGuard(ctx, new JwtFakeUserProvider(), { secret: TEST_SECRET })
+
+    const error = await guard.authenticate().catch((e) => e)
+    assert.instanceOf(error, errors.E_UNAUTHORIZED_ACCESS)
+    await error.handle(error, ctx)
+
+    assert.equal(ctx.response.getStatus(), 401)
+    assert.deepEqual(ctx.response.getBody(), { errors: [{ message: 'Unauthorized access' }] })
+  })
+
+  test('a jwt renderer registered by the application takes precedence', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.accept = 'application/json'
+    const error = new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+      guardDriverName: 'jwt',
+    })
+    ;(error.renderers as Record<string, any>).jwt = (_: string, __: unknown, c: any) =>
+      c.response.status(401).send({ custom: true })
+
+    await error.handle(error, ctx)
+
+    assert.deepEqual(ctx.response.getBody(), { custom: true })
+  })
+
+  test('the other guards keep their own renderers', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.accept = 'text/html'
+    const error = new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
+      guardDriverName: 'basic_auth',
+    })
+
+    await error.handle(error, ctx)
+
+    assert.match(ctx.response.getHeader('www-authenticate') as string, /^Basic realm/)
+  })
+})
+
+test.group('Security | revoke only succeeds when a refresh token is revoked', () => {
+  test('a bearer client that sends its access token on logout gets a 401', async ({ assert }) => {
+    const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const options = { secret: TEST_SECRET, refreshTokenUserProvider }
+    const { token, refreshToken } = await new JwtGuard(
+      new HttpContextFactory().create(),
+      new JwtFakeUserProvider(),
+      options
+    ).generate(user)
+
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    const guard = new JwtGuard(ctx, new JwtFakeUserProvider(), options)
+
+    await assert.rejects(() => guard.revoke(), errors.E_UNAUTHORIZED_ACCESS)
+    // the refresh token was not revoked, and the client now knows it
+    assert.isNotNull(await User.refreshTokens.verify(new Secret(refreshToken!)))
+  })
+
+  test('revoking the same refresh token twice fails the second time', async ({ assert }) => {
+    const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const created = await User.refreshTokens.create(user)
+    const refreshToken = created.value!.release()
+    const newGuard = () =>
+      new JwtGuard(new HttpContextFactory().create(), new JwtFakeUserProvider(), {
+        secret: TEST_SECRET,
+        refreshTokenUserProvider,
+      })
+
+    await newGuard().revoke(refreshToken)
+    await assert.rejects(() => newGuard().revoke(refreshToken), errors.E_UNAUTHORIZED_ACCESS)
+  })
+
+  test('after a refresh in the same request, revoke the refresh token it issued', async ({
+    assert,
+  }) => {
+    const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const created = await User.refreshTokens.create(user)
+    const oldRefreshToken = created.value!.release()
+
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.cookie = `refreshToken=${signCookie('refreshToken', oldRefreshToken)}`
+    const guard = new JwtGuard(ctx, new JwtFakeUserProvider(), {
+      secret: TEST_SECRET,
+      useCookies: true,
+      useCookiesForRefreshToken: true,
+      refreshTokenUserProvider,
+    })
+
+    // e.g. a middleware refreshes the expired access token, then the route logs out
+    const { refreshToken: newRefreshToken } = await guard.generateWithRefreshToken()
+    await guard.revoke()
+
+    assert.isNull(await User.refreshTokens.verify(new Secret(oldRefreshToken)))
+    assert.isNull(await User.refreshTokens.verify(new Secret(newRefreshToken)))
   })
 })

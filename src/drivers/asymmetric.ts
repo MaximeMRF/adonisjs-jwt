@@ -56,6 +56,14 @@ export class AsymmetricDriver implements JwtDriver {
         `publicKey type "${publicKey.asymmetricKeyType}" does not match algorithm "${algorithm}"`
       )
     }
+
+    /**
+     * With keys from two different pairs, every token the guard issues
+     * would be rejected by the same guard: all users would be locked out
+     */
+    if (!createPublicKey(privateKey).equals(publicKey)) {
+      throw new Error('publicKey does not belong to the same key pair as privateKey')
+    }
   }
 
   sign(payload: Record<string, any>, options?: { expiresIn?: number | StringValue }): string {
