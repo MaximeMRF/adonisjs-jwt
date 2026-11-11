@@ -4,6 +4,7 @@ import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/acce
 import type { Options } from 'jwks-rsa'
 import type { CookieOptions } from '@adonisjs/core/types/http'
 import type { JwtDriver } from './drivers/types.js'
+import type { Secret } from '@adonisjs/core/helpers'
 
 export type JwtCookieOptions = Omit<Partial<CookieOptions>, 'maxAge' | 'expires'>
 
@@ -55,6 +56,11 @@ export type BaseJwtContent = {
  */
 export const DEFAULT_TOKEN_EXPIRES_IN = '1h'
 
+/**
+ * Lifetime of refresh tokens when `refreshTokenExpiresIn` is not configured
+ */
+export const DEFAULT_REFRESH_TOKEN_EXPIRES_IN = '7d'
+
 export const ALLOWED_SYMMETRIC_ALGORITHMS = ['HS256', 'HS384', 'HS512'] as const
 export type JwtSymmetricAlgorithm = (typeof ALLOWED_SYMMETRIC_ALGORITHMS)[number]
 
@@ -101,11 +107,11 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
   /**
    * Symmetric signing secret (HMAC). Used when asymmetric keys are not set.
    */
-  secret?: string
+  secret?: string | Secret<string>
   /**
    * PEM-encoded private key for signing access tokens (asymmetric mode).
    */
-  privateKey?: string
+  privateKey?: string | Secret<string>
   /**
    * PEM-encoded public key for verifying access tokens (asymmetric mode).
    */

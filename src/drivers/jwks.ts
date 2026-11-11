@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import { errors } from '@adonisjs/auth'
+import { RuntimeException } from '@adonisjs/core/exceptions'
 import type { Options } from 'jwks-rsa'
 import type { StringValue } from 'ms'
 import { JwksManager } from '../jwks.js'
@@ -66,9 +67,9 @@ export class JwksDriver implements JwtDriver {
   }
 
   sign(_payload: Record<string, any>, _options?: { expiresIn?: number | StringValue }): never {
-    throw new errors.E_UNAUTHORIZED_ACCESS("You can't use the auth.generate method with jwks", {
-      guardDriverName: 'jwt',
-    })
+    throw new RuntimeException(
+      'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+    )
   }
 
   async verify(token: string): Promise<Record<string, any> | string> {
