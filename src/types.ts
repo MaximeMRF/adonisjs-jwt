@@ -89,14 +89,19 @@ export const ALLOWED_JWKS_ALGORITHMS = [
 export type JwtJwksAlgorithm = (typeof ALLOWED_JWKS_ALGORITHMS)[number]
 
 /**
- * `refreshToken` is a string when the guard has a `refreshTokenUserProvider`
+ * Tokens returned by `generate()` and `generateWithRefreshToken()`.
+ * Lifetimes are in seconds, like `expires_in` in OAuth 2.0 (RFC 6749),
+ * whatever the format used in the config (`'1h'` gives `3600`).
+ * `refreshToken` and `refreshTokenExpiresIn` are set when the guard has
+ * a `refreshTokenUserProvider`.
  */
 export type JwtGenerateResult<WithRefreshToken extends boolean = boolean> = {
-  type: string
+  type: 'bearer'
   token: string
-  expiresIn?: number | StringValue
-  refreshTokenExpiresIn?: number | StringValue
-} & ([WithRefreshToken] extends [true] ? { refreshToken: string } : { refreshToken?: string })
+  expiresIn: number
+} & ([WithRefreshToken] extends [true]
+  ? { refreshToken: string; refreshTokenExpiresIn: number }
+  : { refreshToken?: string; refreshTokenExpiresIn?: number })
 
 export type JwtGuardOptions<RealUser extends any = unknown> = {
   /**

@@ -247,7 +247,7 @@ test('generate should return correct expires in when configured', async ({ asser
   })
 
   const tokens: any = await guard.generate(user)
-  assert.equal(tokens.refreshTokenExpiresIn, '2h')
+  assert.equal(tokens.refreshTokenExpiresIn, 2 * 60 * 60)
 })
 
 test('findRefreshToken should find token in cookie', async ({ assert }) => {

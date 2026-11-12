@@ -42,7 +42,7 @@ Keep `tokenExpiresIn` short, e.g. `15m`, and use [refresh tokens](/guide/refresh
 
 - Refresh tokens are stored hashed in the database.
 - Each refresh token can be used once. A replayed refresh token is rejected, and only one of two concurrent refreshes with the same token succeeds.
-- Set `refreshTokenExpiresIn`, otherwise refresh tokens never expire.
+- Refresh tokens expire after 7 days by default. Use `refreshTokenExpiresIn` to change it.
 - Refresh tokens are never read from the query string.
 
 ## Cookies

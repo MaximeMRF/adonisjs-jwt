@@ -16,15 +16,15 @@ Returns a `JwtGenerateResult`:
 
 ```ts
 type JwtGenerateResult = {
-  type: string // 'bearer'
+  type: 'bearer'
   token: string
-  expiresIn?: number | string // tokenExpiresIn
+  expiresIn: number // seconds
   refreshToken?: string
-  refreshTokenExpiresIn?: number | string
+  refreshTokenExpiresIn?: number // seconds
 }
 ```
 
-When the guard has a `refreshTokenUserProvider`, `refreshToken` is typed as `string`, so no non-null assertion is needed.
+`expiresIn` and `refreshTokenExpiresIn` are in seconds, whatever the format of `tokenExpiresIn` and `refreshTokenExpiresIn` in the config. When the guard has a `refreshTokenUserProvider`, `refreshToken` and `refreshTokenExpiresIn` are always set and typed accordingly, so no non-null assertion is needed.
 
 Throws in JWKS mode.
 

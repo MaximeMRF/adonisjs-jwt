@@ -88,7 +88,7 @@ A `tokensUserProvider()` from `@adonisjs/auth/access_tokens`. Enables refresh to
 
 `number | string`. Lifetime of refresh tokens.
 
-Default: none, refresh tokens never expire.
+Default: `'7d'`. The same lifetime is used for the database row, the cookie and the `generate()` result.
 
 ### refreshTokenAbilities
 
