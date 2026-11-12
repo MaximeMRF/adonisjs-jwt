@@ -169,3 +169,11 @@ function release(value: unknown) {
     ? (value as { release(): unknown }).release()
     : value
 }
+
+/**
+ * A lifetime from the config (a number of seconds or a `ms` duration such
+ * as `'1h'`), as a whole number of seconds. Lifetimes are validated first.
+ */
+export function toSeconds(value: number | string): number {
+  return Math.floor(typeof value === 'number' ? value : ms(value as ms.StringValue) / 1000)
+}

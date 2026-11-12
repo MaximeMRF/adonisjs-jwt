@@ -72,7 +72,7 @@ test.group('Security | access token lifetime', () => {
     const result = await guard.generate(user!.getOriginal())
     const payload = jwt.decode(result.token) as jwt.JwtPayload
 
-    assert.equal(result.expiresIn, '1h')
+    assert.equal(result.expiresIn, 3600)
     assert.equal(payload.exp! - payload.iat!, 60 * 60)
   })
 
@@ -1424,7 +1424,7 @@ test.group('Security | refresh tokens expire after 7 days by default', () => {
     const { refreshTokenExpiresIn } = await guard.generate(user)
     const sevenDays = 7 * 24 * 60 * 60
 
-    assert.equal(refreshTokenExpiresIn, '7d')
+    assert.equal(refreshTokenExpiresIn, sevenDays)
 
     const [row] = await User.refreshTokens.all(user)
     const lifetime = (row!.expiresAt!.getTime() - before) / 1000
@@ -1465,6 +1465,66 @@ test.group('Security | refresh tokens expire after 7 days by default', () => {
       { secret: TEST_SECRET, refreshTokenExpiresIn: '30d', refreshTokenUserProvider }
     ).generate(user)
 
-    assert.equal(refreshTokenExpiresIn, '30d')
+    assert.equal(refreshTokenExpiresIn, 30 * 24 * 60 * 60)
+  })
+})
+
+test.group('Security | lifetimes in the generate() result are in seconds', () => {
+  test('tokenExpiresIn {config} gives expiresIn {seconds}')
+    .with([
+      { config: '15m', seconds: 900 },
+      { config: '1.5h', seconds: 5400 },
+      { config: '1500ms', seconds: 1 },
+      { config: 900, seconds: 900 },
+    ])
+    .run(async ({ assert }, { config, seconds }) => {
+      const userProvider = new JwtFakeUserProvider()
+      const guard = new JwtGuard(new HttpContextFactory().create(), userProvider, {
+        secret: TEST_SECRET,
+        tokenExpiresIn: config as any,
+      })
+      const result = await guard.generate((await userProvider.findById(1))!.getOriginal())
+
+      assert.strictEqual(result.expiresIn, seconds)
+      // a client can trust expiresIn: it matches the exp claim of the token
+      const { iat, exp } = jwt.decode(result.token) as { iat: number; exp: number }
+      assert.closeTo(exp - iat, seconds, 1)
+    })
+
+  test('without refresh tokens, refreshTokenExpiresIn is not set', async ({ assert }) => {
+    const userProvider = new JwtFakeUserProvider()
+    const result = await new JwtGuard(new HttpContextFactory().create(), userProvider, {
+      secret: TEST_SECRET,
+      refreshTokenExpiresIn: '7d',
+    }).generate((await userProvider.findById(1))!.getOriginal())
+
+    assert.notProperty(
+      JSON.parse(JSON.stringify(result)),
+      'refreshTokenExpiresIn',
+      'no lifetime for a refresh token that was not issued'
+    )
+  })
+
+  test('generateWithRefreshToken() returns seconds too', async ({ assert }) => {
+    const { user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const options = {
+      secret: TEST_SECRET,
+      tokenExpiresIn: '10m' as const,
+      refreshTokenUserProvider,
+    }
+    const { refreshToken } = await new JwtGuard(
+      new HttpContextFactory().create(),
+      new JwtFakeUserProvider(),
+      options
+    ).generate(user)
+
+    const result = await new JwtGuard(
+      new HttpContextFactory().create(),
+      new JwtFakeUserProvider(),
+      options
+    ).generateWithRefreshToken(refreshToken)
+
+    assert.strictEqual(result.expiresIn, 600)
+    assert.strictEqual(result.refreshTokenExpiresIn, 7 * 24 * 60 * 60)
   })
 })

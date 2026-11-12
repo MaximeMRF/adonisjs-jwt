@@ -83,7 +83,7 @@ test.group('Jwt guard | authenticate', () => {
     assert.exists(tokens?.token)
     assert.exists(tokens?.refreshToken)
     // refresh tokens get a lifetime by default
-    assert.equal(tokens?.refreshTokenExpiresIn, '7d')
+    assert.equal(tokens?.refreshTokenExpiresIn, 7 * 24 * 60 * 60)
 
     // The old refresh token should be gone/invalid
     assert.notEqual(tokens?.refreshToken, refreshToken.value?.release())
@@ -491,7 +491,7 @@ test.group('Jwt guard | authenticate', () => {
 
     assert.equal(tokenResponse.type, 'bearer')
     assert.exists(tokenResponse.token)
-    assert.equal(tokenResponse.expiresIn, '1h')
+    assert.equal(tokenResponse.expiresIn, 3600)
 
     assert.equal(decoded.userId, content.userId)
     assert.equal(decoded.otherProperty, content.otherProperty)

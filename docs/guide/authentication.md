@@ -23,13 +23,13 @@ router.post('login', async ({ request, auth }) => {
 {
   "type": "bearer",
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expiresIn": "1h",
+  "expiresIn": 3600,
   "refreshToken": "rt_MQ.xxxxxxxx",
-  "refreshTokenExpiresIn": "7d"
+  "refreshTokenExpiresIn": 604800
 }
 ```
 
-`refreshToken` and `refreshTokenExpiresIn` are only set when [refresh tokens](/guide/refresh-tokens) are configured. With [cookies](/guide/token-transport) enabled, `generate()` also sets the tokens as cookies on the response.
+`expiresIn` and `refreshTokenExpiresIn` are lifetimes in seconds, like `expires_in` in OAuth 2.0, whatever the format of the config (`'1h'` gives `3600`). A client can use them to refresh the access token before it expires. `refreshToken` and `refreshTokenExpiresIn` are only set when [refresh tokens](/guide/refresh-tokens) are configured. With [cookies](/guide/token-transport) enabled, `generate()` also sets the tokens as cookies on the response.
 
 ::: tip
 `User.verifyCredentials` comes from the `withAuthFinder` mixin of `@adonisjs/auth`. See [Verifying user credentials](https://docs.adonisjs.com/guides/authentication/verifying-user-credentials).

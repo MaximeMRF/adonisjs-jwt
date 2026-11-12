@@ -13,7 +13,12 @@ import {
 import { Secret } from '@adonisjs/core/helpers'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { JwtDriver } from './drivers/types.js'
-import { releaseSecrets, validateGuardOptions, type ReleasedSecrets } from './validation.js'
+import {
+  releaseSecrets,
+  toSeconds,
+  validateGuardOptions,
+  type ReleasedSecrets,
+} from './validation.js'
 import { resolveDriver } from './driver_resolver.js'
 import { installJwtUnauthorizedRenderer } from './errors.js'
 
@@ -184,9 +189,11 @@ export class JwtGuard<
     return {
       type: 'bearer',
       token: token,
-      expiresIn: this.#options.tokenExpiresIn,
+      expiresIn: toSeconds(this.#options.tokenExpiresIn!),
       refreshToken: refreshToken,
-      refreshTokenExpiresIn: this.#options.refreshTokenExpiresIn,
+      refreshTokenExpiresIn: refreshToken
+        ? toSeconds(this.#options.refreshTokenExpiresIn!)
+        : undefined,
     } as JwtGenerateResult<WithRefreshToken>
   }
 

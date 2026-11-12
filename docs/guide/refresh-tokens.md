@@ -98,7 +98,7 @@ jwtGuard({
 })
 ```
 
-Without `refreshTokenExpiresIn`, refresh tokens never expire. Setting it is recommended.
+Without `refreshTokenExpiresIn`, refresh tokens expire after 7 days.
 
 `generate()` now returns a refresh token next to the access token.
 
