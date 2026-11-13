@@ -17,6 +17,8 @@ A single-page app (React, Vue, Svelte…) served from another origin than the AP
 
 ```ts
 // config/auth.ts
+import app from '@adonisjs/core/services/app'
+
 jwt: jwtGuard({
   // ...
   useCookies: true,
@@ -103,6 +105,37 @@ async function api(path: string, init: RequestInit = {}) {
   return response
 }
 ```
+
+### With the CSRF protection of Shield
+
+If you enable the [CSRF protection](/guide/token-transport#csrf) of `@adonisjs/shield`, every `POST` must carry the token from the `XSRF-TOKEN` cookie, in the `X-XSRF-TOKEN` header. axios does it by default, `fetch()` doesn't.
+
+Shield also answers an invalid token with a **redirect**, not an error. `fetch()` follows it, so with the wrapper above a rejected login or refresh looks successful: `res.ok` is `true`, and no cookie was set. Pass `redirect: 'error'` so that the request fails instead:
+
+```ts
+function xsrfToken() {
+  const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/)
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
+function send(path: string, init: RequestInit = {}) {
+  return fetch(`${API_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+    redirect: 'error', // a CSRF failure rejects instead of following Shield's redirect
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-XSRF-TOKEN': xsrfToken(),
+      ...init.headers,
+    },
+  })
+}
+```
+
+Use `send()` for every request of the wrapper, including the call to `/refresh`. Shield sets the `XSRF-TOKEN` cookie on every response, so call a `GET` route when the app starts (for example `/me`) before the first `POST`.
+
+`document.cookie` only reads the cookies of the page's own domain. When the app runs on `app.example.com` and the API on `api.example.com`, the `XSRF-TOKEN` cookie set by the API isn't readable by the app, unless it's set for the parent domain: set `cookie.domain` to `'.example.com'` in the `http` config of `config/app.ts`. Every cookie of the API is then sent to every subdomain, so only do it when you control all of them.
 
 Two tabs can still refresh at the same time: the one that loses gets a `401` but keeps the cookies set by the other one, so its next request succeeds. Retry once more before showing the login page, or coordinate tabs with the [Web Locks API](https://developer.mozilla.org/docs/Web/API/Web_Locks_API).
 

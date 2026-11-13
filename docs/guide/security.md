@@ -23,6 +23,7 @@ openssl rand -hex 32
 
 The guard rejects:
 
+- tokens without `exp`, which would never expire, including tokens issued by another service or an identity provider;
 - expired tokens, and tokens not valid yet (`nbf`), with an optional [`clockTolerance`](/reference/options#clocktolerance);
 - tokens signed with another algorithm than the configured one, including unsigned tokens (`alg: none`) and HMAC tokens signed with a public key;
 - tokens whose `iss` or `aud` don't match `issuer` and `audience`, when set;
