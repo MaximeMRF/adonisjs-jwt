@@ -3,6 +3,7 @@ import { JwtGuard } from '../src/guard.js'
 import { JwksDriver } from '../src/drivers/jwks.js'
 import { jwtGuard } from '../src/define_config.js'
 import { HttpContextFactory } from '@adonisjs/core/factories/http'
+import { Redirect } from '@adonisjs/core/http'
 import { JwtFakeUserProvider } from '../factories/main.js'
 import { BaseModel, column } from '@adonisjs/lucid/orm'
 import { AuthManager, errors } from '@adonisjs/auth'
@@ -17,10 +18,14 @@ import crypto from 'node:crypto'
 
 const APP_KEY = 'app-key-with-at-least-32-characters'
 
-function fakeApp(appKey?: string) {
+/**
+ * `app.appKey` is a Secret in AdonisJS v6 apps (`new Secret(env.get('APP_KEY'))`),
+ * or a plain string when it was added by hand to a v7 app for 0.9
+ */
+function fakeApp(appKey?: string, { asString = false } = {}) {
   return {
     config: {
-      get: () => (appKey === undefined ? undefined : { release: () => appKey }),
+      get: () => (appKey === undefined ? undefined : asString ? appKey : { release: () => appKey }),
     },
   } as any
 }
@@ -178,6 +183,30 @@ test.group('Security | app key fallback', () => {
     assert.isTrue(await v6Factory(ctx).check())
   })
 
+  test('accept a plain string app.appKey, as added by hand to config/app.ts for 0.9', async ({
+    assert,
+  }) => {
+    const userProvider = new JwtFakeUserProvider()
+    const user = await userProvider.findById(1)
+
+    const stringFactory = await jwtGuard({ provider: userProvider }).resolver(
+      'jwt',
+      fakeApp(APP_KEY, { asString: true })
+    )
+    const { token } = await stringFactory(new HttpContextFactory().create()).generate(
+      user!.getOriginal()
+    )
+
+    // Same derived key as with a Secret: removing the line from config/app.ts keeps tokens valid
+    const secretFactory = await jwtGuard({ provider: userProvider }).resolver(
+      'jwt',
+      fakeApp(APP_KEY)
+    )
+    const ctx = new HttpContextFactory().create()
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    assert.isTrue(await secretFactory(ctx).check())
+  })
+
   test('do not read the app key when a secret is configured', async ({ assert }) => {
     const factory = await jwtGuard({
       provider: new JwtFakeUserProvider(),
@@ -201,6 +230,11 @@ test.group('Security | JWKS', (group) => {
       { missing: 'audience', options: { issuer: 'jwks-issuer' } },
       { missing: 'issuer', options: { audience: 'jwks-audience' } },
       { missing: 'a non-empty audience', options: { issuer: 'jwks-issuer', audience: [] } },
+      {
+        // e.g. an audience list read from an env variable with a trailing comma
+        missing: 'an empty string in the audience',
+        options: { issuer: 'jwks-issuer', audience: ['jwks-audience', ''] },
+      },
     ])
     .run(({ assert }, { options }) => {
       assert.throws(
@@ -882,6 +916,27 @@ test.group('Security | 401 responses', () => {
   }) => {
     const response = await render('text/html, application/xhtml+xml', { redirectTo: '/login' })
 
+    assert.equal(response.getStatus(), 302)
+    assert.equal(response.getHeader('location'), '/login')
+  })
+
+  test('with @adonisjs/session, the redirect keeps the intended URL, like the session guard', async ({
+    assert,
+    cleanup,
+  }) => {
+    // @adonisjs/session adds this macro, so the user goes back to the page after logging in
+    let intendedUrlSaved = 0
+    Redirect.macro('withIntendedUrl' as any, function (this: Redirect) {
+      intendedUrlSaved++
+      return this
+    })
+    cleanup(() => {
+      delete (Redirect.prototype as { withIntendedUrl?: unknown }).withIntendedUrl
+    })
+
+    const response = await render('text/html', { redirectTo: '/login' })
+
+    assert.equal(intendedUrlSaved, 1)
     assert.equal(response.getStatus(), 302)
     assert.equal(response.getHeader('location'), '/login')
   })
