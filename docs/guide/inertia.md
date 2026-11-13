@@ -59,14 +59,18 @@ async store({ request, auth, response }: HttpContext) {
 async destroy({ auth, response }: HttpContext) {
   try { // [!code ++]
     await auth.use('jwt').revoke() // [!code ++]
-  } catch {} // [!code ++]
+  } catch (error) { // [!code ++]
+    if (!(error instanceof errors.E_UNAUTHORIZED_ACCESS)) throw error // [!code ++]
+  } // [!code ++]
   response.redirect().toRoute('session.create')
 }
 ```
 
 Do the same in the signup controller.
 
-`revoke()` throws a `401` when the request has no valid refresh token, for example when it has expired. On a page, the user wants to be logged out anyway: the `try/catch` ignores the error, `revoke()` has already cleared the cookies, and the user is redirected to the login page. Without it, Inertia shows "Unauthorized access" in its error modal.
+`revoke()` throws a `401` when the request has no valid refresh token, for example when it has expired. On a page, the user wants to be logged out anyway: the `try/catch` ignores this `401` (import `errors` from `@adonisjs/auth`), `revoke()` has already cleared the cookies, and the user is redirected to the login page. Without it, Inertia shows "Unauthorized access" in its error modal.
+
+Only ignore `E_UNAUTHORIZED_ACCESS`. An empty `catch {}` would also hide a database outage: the user would be redirected as if logged out, while their refresh token stays valid, and nothing would be logged.
 
 ## Redirect to the login page
 
@@ -83,6 +87,7 @@ An access token lives `tokenExpiresIn`, `15m` above. Without a refresh, the user
 
 ```ts
 // app/middleware/jwt_refresh_middleware.ts
+import { errors } from '@adonisjs/auth'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
 
@@ -92,7 +97,10 @@ export default class JwtRefreshMiddleware {
     if (!(await jwt.check())) {
       try {
         await jwt.generateWithRefreshToken() // sets the new cookies
-      } catch {}
+      } catch (error) {
+        // no valid refresh token: continue as a guest, the auth middleware redirects
+        if (!(error instanceof errors.E_UNAUTHORIZED_ACCESS)) throw error
+      }
     }
     return next()
   }

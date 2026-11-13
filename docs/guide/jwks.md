@@ -6,7 +6,7 @@ In JWKS mode, the guard doesn't issue tokens: it verifies tokens signed by an ex
 
 ```ts
 jwtGuard({
-  provider: new MyUserProvider(),
+  provider: new MyUserProvider(), // see "User id" below
   jwks: {
     jwksUri: 'https://your-auth-server/.well-known/jwks.json',
   },
@@ -69,7 +69,7 @@ In JWKS mode, `verifyPayload` can replace `audience`, for providers whose access
 
 Tokens issued by an external provider don't carry a `userId` claim. `getUserId` tells the guard where to find the user id in the verified payload. It defaults to `(payload) => payload.userId`.
 
-The guard then calls `provider.findById()` with this id. If your users are not stored by provider id, write a [custom user provider](/reference/guard#user-provider) that maps the id to your user.
+The guard then calls `provider.findById()` with this id. If the primary key of your users is the provider id, `sessionUserProvider({ model: () => import('#models/user') })` from `@adonisjs/auth/session` works as is. Otherwise, write a [custom user provider](/reference/guard#user-provider) that maps the id to your user.
 
 ## Algorithms
 
@@ -92,6 +92,13 @@ The guard uses [`jwks-rsa`](https://github.com/auth0/node-jwks-rsa) to fetch the
 | `rateLimit`             | `true`  |
 | `jwksRequestsPerMinute` | `10`    |
 | `timeout`               | `5000`  |
+| `cacheMaxAge`           | `600000` (10 minutes, `jwks-rsa` default) |
+
+### Key rotation and revocation
+
+When the provider rotates its keys, a token signed with the new key has an unknown `kid`, so the guard fetches the key set again (within `jwksRequestsPerMinute`) and accepts it.
+
+A key **removed** from the key set, for example a compromised one, is still accepted until it expires from the cache, so for up to `cacheMaxAge`. Lower `cacheMaxAge` to make revocations take effect sooner, at the cost of more requests to the provider, or restart the application to empty the cache at once.
 
 ## Clock skew
 

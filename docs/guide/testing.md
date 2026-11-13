@@ -4,10 +4,17 @@ The guard supports the `loginAs` method of the Japa [API client](https://docs.ad
 
 ## Setup
 
-Register the auth plugin in `tests/bootstrap.ts`, if your application doesn't do it yet:
+`loginAs` needs the Japa API client. The API starter kit already has it. The Inertia and web starter kits only ship the browser client, so install it first:
+
+```sh
+npm i -D @japa/api-client
+```
+
+Then register the API client and the auth plugin in `tests/bootstrap.ts`, if your application doesn't do it yet:
 
 ```ts
 // tests/bootstrap.ts
+import { apiClient } from '@japa/api-client'
 import { authApiClient } from '@adonisjs/auth/plugins/api_client'
 import app from '@adonisjs/core/services/app'
 
