@@ -26,6 +26,8 @@ Don't set `exp`, use `tokenExpiresIn`.
 
 Default: `(payload) => payload.userId`. Use `(payload) => payload.sub` for tokens issued by an external provider.
 
+Without `getUserId`, `content` must return `userId` (checked by TypeScript). With `getUserId`, `content` can store the user id in another claim.
+
 ### verifyPayload
 
 `(payload) => boolean | Promise<boolean>`. Extra check on a verified payload, run before `getUserId`. Only an explicit `true` accepts the token: any other value, or an exception, rejects it.

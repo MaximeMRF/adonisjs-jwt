@@ -1222,9 +1222,9 @@ test.group('Security | misuses are server errors, not 401s', (group) => {
   })
 
   const REFRESH_NOT_CONFIGURED =
-    'Refresh tokens are not configured: set `refreshTokenUserProvider` in the JWT guard config'
+    'JWT guard refresh tokens are not configured: set `refreshTokenUserProvider` in the guard config'
   const NO_SIGNING_IN_JWKS =
-    'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+    'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
 
   function jwksGuard() {
     const driver = new JwksDriver(

@@ -1,8 +1,9 @@
 import ms from 'ms'
 import type { JwtGuardOptions } from './types.js'
+import type { JwtGuardInternalOptions } from './drivers/types.js'
 
 export function validateGuardOptions(
-  options: ReleasedSecrets<JwtGuardOptions>,
+  options: ReleasedSecrets<JwtGuardOptions & JwtGuardInternalOptions>,
   prefix: string = 'JWT guard'
 ) {
   validateLifetimes(options, prefix)

@@ -103,6 +103,7 @@ import { jwtGuard, JwtGuard, DEFAULT_TOKEN_EXPIRES_IN } from '@maximemrf/adonisj
 
 // types
 import type {
+  JwtGuardConfig,
   JwtGuardOptions,
   JwtGuardUser,
   JwtUserProviderContract,
@@ -111,5 +112,7 @@ import type {
   JwtCookieOptions,
 } from '@maximemrf/adonisjs-jwt/types'
 ```
+
+`JwtGuardConfig` is the type of the `jwtGuard()` config, and `JwtGuardOptions` the type of the `JwtGuard` constructor options. `@maximemrf/adonisjs-jwt/types` only exports types.
 
 `@maximemrf/adonisjs-jwt/jwt_config` still exports `jwtGuard`, for compatibility with 0.x.

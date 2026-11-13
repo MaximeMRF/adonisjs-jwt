@@ -1,9 +1,13 @@
-import { type symbols } from '@adonisjs/auth'
+import type { symbols } from '@adonisjs/auth'
 import type { StringValue } from 'ms'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
 import type { Options } from 'jwks-rsa'
 import type { CookieOptions } from '@adonisjs/core/types/http'
-import type { JwtDriver } from './drivers/types.js'
+import type {
+  ALLOWED_ASYMMETRIC_ALGORITHMS,
+  ALLOWED_JWKS_ALGORITHMS,
+  ALLOWED_SYMMETRIC_ALGORITHMS,
+} from './constants.js'
 import type { Secret } from '@adonisjs/core/helpers'
 
 export type JwtCookieOptions = Omit<Partial<CookieOptions>, 'maxAge' | 'expires'>
@@ -33,7 +37,7 @@ export interface JwtUserProviderContract<RealUser> {
    * A property the guard implementation can use to infer
    * the data type of the actual user (aka RealUser)
    */
-  [symbols.PROVIDER_REAL_USER]?: RealUser
+  [symbols.PROVIDER_REAL_USER]: RealUser
 
   /**
    * Create a user object that acts as an adapter between
@@ -51,40 +55,13 @@ export type BaseJwtContent = {
   userId: string | number | BigInt
 }
 
-/**
- * Lifetime of access tokens when `tokenExpiresIn` is not configured
- */
-export const DEFAULT_TOKEN_EXPIRES_IN = '1h'
-
-/**
- * Lifetime of refresh tokens when `refreshTokenExpiresIn` is not configured
- */
-export const DEFAULT_REFRESH_TOKEN_EXPIRES_IN = '7d'
-
-export const ALLOWED_SYMMETRIC_ALGORITHMS = ['HS256', 'HS384', 'HS512'] as const
 export type JwtSymmetricAlgorithm = (typeof ALLOWED_SYMMETRIC_ALGORITHMS)[number]
-
-export const ALLOWED_ASYMMETRIC_ALGORITHMS = [
-  'RS256',
-  'RS384',
-  'RS512',
-  'ES256',
-  'ES384',
-  'ES512',
-] as const
 
 /**
  * Algorithms supported for asymmetric (RSA / ECDSA) JWT signing and verification.
  * Use with `privateKey` + `publicKey` so access tokens can be verified elsewhere with only the public key.
  */
 export type JwtAsymmetricAlgorithm = (typeof ALLOWED_ASYMMETRIC_ALGORITHMS)[number]
-
-export const ALLOWED_JWKS_ALGORITHMS = [
-  ...ALLOWED_ASYMMETRIC_ALGORITHMS,
-  'PS256',
-  'PS384',
-  'PS512',
-] as const
 
 export type JwtJwksAlgorithm = (typeof ALLOWED_JWKS_ALGORITHMS)[number]
 
@@ -103,12 +80,10 @@ export type JwtGenerateResult<WithRefreshToken extends boolean = boolean> = {
   ? { refreshToken: string; refreshTokenExpiresIn: number }
   : { refreshToken?: string; refreshTokenExpiresIn?: number })
 
-export type JwtGuardOptions<RealUser extends any = unknown> = {
-  /**
-   * Driver resolved by `jwtGuard()`. Not part of the public API: custom
-   * drivers are not supported and the `JwtDriver` interface may change.
-   */
-  driver?: JwtDriver
+/**
+ * Options shared by `jwtGuard()` and the `JwtGuard` constructor
+ */
+type JwtSharedOptions = {
   /**
    * Symmetric signing secret (HMAC). Used when asymmetric keys are not set.
    */
@@ -126,7 +101,6 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
    */
   algorithm?: JwtAsymmetricAlgorithm
   jwks?: Options
-  refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
   tokenName?: string
   /**
    * Name of the refresh token cookie and request body field.
@@ -146,7 +120,6 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
    */
   refreshTokenAbilities?: string[]
   cookie?: JwtCookieOptions
-  content?: (user: JwtGuardUser<RealUser>) => Record<string, any> & BaseJwtContent
   /**
    * Expected JWT issuer (iss). Validated during token verification.
    * Required in JWKS mode.
@@ -167,11 +140,6 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
    */
   clockTolerance?: number
   /**
-   * Extract the user id from a verified token payload.
-   * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
-   */
-  getUserId?: JwtGetUserId
-  /**
    * Extra check on a verified token payload, run before looking up the user.
    * Only an explicit `true` accepts the token: any other value, or an
    * exception, rejects it. Use it to check claims other than
@@ -179,6 +147,48 @@ export type JwtGuardOptions<RealUser extends any = unknown> = {
    */
   verifyPayload?: JwtVerifyPayload
 }
+
+/**
+ * `content` builds the payload of the access tokens. Without `getUserId`,
+ * the guard reads the user id from the `userId` claim, so `content` must
+ * set it. With `getUserId`, `content` is free to use another claim.
+ */
+export type JwtContentOptions<RealUser> =
+  | {
+      /**
+       * Extract the user id from a verified token payload.
+       * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
+       */
+      getUserId?: undefined
+      content?: (user: JwtGuardUser<RealUser>) => Record<string, any> & BaseJwtContent
+    }
+  | {
+      /**
+       * Extract the user id from a verified token payload.
+       * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
+       */
+      getUserId: JwtGetUserId
+      content?: (user: JwtGuardUser<RealUser>) => Record<string, any>
+    }
+
+/**
+ * Options of the `JwtGuard` constructor
+ */
+export type JwtGuardOptions<RealUser = unknown> = JwtSharedOptions & {
+  refreshTokenUserProvider?: AccessTokensUserProviderContract<RealUser>
+} & JwtContentOptions<RealUser>
+
+/**
+ * Config accepted by `jwtGuard()` in `config/auth.ts`
+ */
+export type JwtGuardConfig<
+  UserProvider extends JwtUserProviderContract<unknown>,
+  RefreshTokenUserProvider extends AccessTokensUserProviderContract<unknown> | undefined =
+    undefined,
+> = JwtSharedOptions & {
+  provider: UserProvider
+  refreshTokenUserProvider?: RefreshTokenUserProvider
+} & JwtContentOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
 
 export type JwtVerifyPayload = (payload: Record<string, any>) => boolean | Promise<boolean>
 

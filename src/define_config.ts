@@ -1,22 +1,11 @@
 import type { symbols } from '@adonisjs/auth'
 import type { GuardConfigProvider } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
-import type {
-  JwtAsymmetricAlgorithm,
-  JwtGuardUser,
-  JwtUserProviderContract,
-  JwtCookieOptions,
-  BaseJwtContent,
-  JwtJwksAlgorithm,
-  JwtGetUserId,
-  JwtVerifyPayload,
-} from './types.js'
+import type { JwtUserProviderContract, JwtGuardConfig, JwtGuardOptions } from './types.js'
 import { JwtGuard } from './guard.js'
-import type { Secret } from '@adonisjs/core/helpers'
 import type { ApplicationService } from '@adonisjs/core/types'
-import type { StringValue } from 'ms'
+import type { Secret } from '@adonisjs/core/helpers'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
-import type { Options } from 'jwks-rsa'
 import { releaseSecrets, validateLifetimes, validateSigningMethod } from './validation.js'
 import type { JwtDriver } from './drivers/types.js'
 import { resolveDriver } from './driver_resolver.js'
@@ -26,32 +15,9 @@ export function jwtGuard<
   UserProvider extends JwtUserProviderContract<unknown>,
   RefreshTokenUserProvider extends AccessTokensUserProviderContract<unknown> | undefined =
     undefined,
->(config: {
-  provider: UserProvider
-  refreshTokenUserProvider?: RefreshTokenUserProvider
-  tokenName?: string
-  refreshTokenName?: string
-  tokenExpiresIn?: number | StringValue
-  refreshTokenExpiresIn?: number | StringValue
-  useCookies?: boolean
-  useCookiesForRefreshToken?: boolean
-  refreshTokenAbilities?: string[]
-  secret?: string | Secret<string>
-  privateKey?: string | Secret<string>
-  publicKey?: string
-  algorithm?: JwtAsymmetricAlgorithm
-  content?: (
-    user: JwtGuardUser<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
-  ) => Record<string, any> & BaseJwtContent
-  jwks?: Options
-  cookie?: JwtCookieOptions
-  issuer?: string
-  audience?: string | string[]
-  algorithms?: JwtJwksAlgorithm[]
-  clockTolerance?: number
-  getUserId?: JwtGetUserId
-  verifyPayload?: JwtVerifyPayload
-}): GuardConfigProvider<
+>(
+  config: JwtGuardConfig<UserProvider, RefreshTokenUserProvider>
+): GuardConfigProvider<
   (
     ctx: HttpContext
   ) => JwtGuard<UserProvider, [RefreshTokenUserProvider] extends [undefined] ? false : true>
@@ -87,7 +53,11 @@ export function jwtGuard<
     clockTolerance: config.clockTolerance,
     getUserId: config.getUserId,
     verifyPayload: config.verifyPayload,
-  })
+    /**
+     * `content` and `getUserId` come from the same config, so they keep
+     * the pairing checked by `JwtContentOptions`
+     */
+  } as JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>)
 
   /**
    * Validate the configuration when config/auth.ts is loaded, so a bad

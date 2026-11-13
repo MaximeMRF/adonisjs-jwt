@@ -313,7 +313,7 @@ test('revoke should throw error when provider is not defined', async ({ assert }
   // a configuration mistake is a 500, not a 401 sent to the client
   await assert.rejects(
     () => guard.revoke('some-token'),
-    'Refresh tokens are not configured: set `refreshTokenUserProvider` in the JWT guard config'
+    'JWT guard refresh tokens are not configured: set `refreshTokenUserProvider` in the guard config'
   )
   await assert.rejects(() => guard.revoke('some-token'), RuntimeException)
 })

@@ -13,10 +13,7 @@ import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/acce
 
 test.group('JWT Drivers', () => {
   test('SymmetricDriver should throw error if secret is missing', ({ assert }) => {
-    assert.throws(
-      () => new SymmetricDriver({ secret: '' }),
-      'Symmetric JWT driver requires a secret key'
-    )
+    assert.throws(() => new SymmetricDriver({ secret: '' }), 'JWT guard requires a `secret`')
   })
 
   test('SymmetricDriver should throw error if secret is shorter than 32 characters', ({
@@ -24,7 +21,7 @@ test.group('JWT Drivers', () => {
   }) => {
     assert.throws(
       () => new SymmetricDriver({ secret: SHORT_SECRET }),
-      'Symmetric JWT driver requires a secret of at least 32 characters to ensure sufficient entropy'
+      'JWT guard `secret` must be at least 32 characters to ensure sufficient entropy'
     )
   })
 
@@ -66,7 +63,7 @@ test.group('JWT Drivers', () => {
     )
     assert.throws(
       () => driver.sign({ userId: 1 }),
-      'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+      'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
     )
   })
 
