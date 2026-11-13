@@ -65,6 +65,7 @@ export function jwtGuard<
    * the first request, when the app would already be serving traffic.
    */
   validateLifetimes(options, PREFIX)
+  validateSigningMethod(options, PREFIX, { usesAppKey })
   let driver: JwtDriver | undefined
   if (usesAppKey) {
     /**
@@ -73,7 +74,6 @@ export function jwtGuard<
      */
     if (process.env.APP_KEY !== undefined) assertAppKey(process.env.APP_KEY)
   } else {
-    validateSigningMethod(options, PREFIX)
     driver = resolveDriver(options, PREFIX)
   }
 

@@ -40,6 +40,27 @@ test.group('Public types', () => {
     assert.doesNotThrow(() => jwtGuard(config))
   })
 
+  test('content must not set exp, which comes from tokenExpiresIn', ({ assert }) => {
+    const provider = new JwtFakeUserProvider()
+
+    jwtGuard({
+      provider,
+      secret: SECRET,
+      // @ts-expect-error the guard sets exp from tokenExpiresIn
+      content: (user) => ({ userId: user.getId(), exp: Math.floor(Date.now() / 1000) + 60 }),
+    })
+
+    jwtGuard({
+      provider,
+      secret: SECRET,
+      getUserId: (payload) => payload.sub,
+      // @ts-expect-error also with getUserId
+      content: (user) => ({ sub: String(user.getId()), exp: 0 }),
+    })
+
+    assert.isTrue(true)
+  })
+
   test('user providers must declare the real user type', ({ assert }) => {
     type Service = { id: string }
 

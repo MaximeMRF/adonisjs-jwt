@@ -18,7 +18,7 @@ import { jwtGuard } from '@maximemrf/adonisjs-jwt'
 
 Default: `(user) => ({ userId: user.getId() })`.
 
-Don't set `exp`, use `tokenExpiresIn`.
+Don't set `exp`, use `tokenExpiresIn`: TypeScript rejects it, and `generate()` throws. With `issuer` or `audience` configured, don't set `iss` or `aud` either.
 
 ### getUserId
 

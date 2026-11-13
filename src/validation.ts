@@ -70,7 +70,11 @@ function assertDuration(value: unknown, name: string, prefix: string) {
 /**
  * Exactly one signing method: a secret, an asymmetric key pair, or a JWKS endpoint
  */
-export function validateSigningMethod(options: ReleasedSecrets<JwtGuardOptions>, prefix: string) {
+export function validateSigningMethod(
+  options: ReleasedSecrets<JwtGuardOptions>,
+  prefix: string,
+  { usesAppKey = false }: { usesAppKey?: boolean } = {}
+) {
   const asymmetricPartial =
     options.privateKey !== undefined ||
     options.publicKey !== undefined ||
@@ -136,7 +140,11 @@ export function validateSigningMethod(options: ReleasedSecrets<JwtGuardOptions>,
     throw new Error(`${prefix} \`jwks.jwksUri\` is required to fetch the identity provider keys`)
   }
 
-  if (!options.jwks && !usesAsymmetric && !options.secret) {
+  /**
+   * Without a signing method, `jwtGuard()` derives the secret from the app
+   * key in the resolver
+   */
+  if (!usesAppKey && !options.jwks && !usesAsymmetric && !options.secret) {
     throw new Error(
       `${prefix} requires \`secret\` (symmetric), or \`privateKey\` + \`publicKey\` + \`algorithm\` (asymmetric), or \`jwks\``
     )

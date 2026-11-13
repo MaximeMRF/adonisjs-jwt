@@ -61,7 +61,7 @@ jwtGuard({
 The payload must contain `userId`: the guard uses it to find the user when it verifies a token. To read the user id from another claim, for example `sub`, set [`getUserId`](/reference/options#getuserid).
 
 ::: warning
-Don't set `exp` in `content`, use `tokenExpiresIn`. A JWT payload is only base64 encoded, not encrypted: don't put secrets in it.
+Don't set `exp` in `content`, use `tokenExpiresIn`: TypeScript rejects it, and `generate()` throws. A JWT payload is only base64 encoded, not encrypted: don't put secrets in it.
 :::
 
 ## Signing key

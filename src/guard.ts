@@ -156,7 +156,8 @@ export class JwtGuard<
     }
     const providerUser = await this.#userProvider.createUserForGuard(user)
 
-    const signPayload = this.#options.content!(providerUser)
+    const signPayload: Record<string, any> = this.#options.content!(providerUser)
+    assertNoGuardClaims(signPayload, this.#options)
     const token = this.#signAccessToken(signPayload)
 
     let refreshToken
@@ -509,6 +510,28 @@ export class JwtGuard<
 
 const REFRESH_TOKENS_NOT_CONFIGURED =
   'JWT guard refresh tokens are not configured: set `refreshTokenUserProvider` in the guard config'
+
+/**
+ * The guard sets `exp`, and `iss` / `aud` when `issuer` / `audience` are
+ * configured. jsonwebtoken refuses a payload that sets them too, with a
+ * message about its own options (`options.expiresIn`) that the app never set.
+ */
+function assertNoGuardClaims(
+  payload: Record<string, any>,
+  options: { issuer?: string; audience?: string | string[] }
+) {
+  const conflicts: Array<[claim: string, option: string]> = [['exp', 'tokenExpiresIn']]
+  if (options.issuer) conflicts.push(['iss', 'issuer'])
+  if (options.audience) conflicts.push(['aud', 'audience'])
+
+  for (const [claim, option] of conflicts) {
+    if (payload[claim] !== undefined) {
+      throw new RuntimeException(
+        `JWT guard \`content\` must not set \`${claim}\`: the guard sets it from \`${option}\``
+      )
+    }
+  }
+}
 
 function isUserId(value: unknown): value is string | number | bigint {
   return (
