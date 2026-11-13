@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken'
 import type { StringValue } from 'ms'
 import type { JwtDriver } from './types.js'
-import { ALLOWED_SYMMETRIC_ALGORITHMS } from '../types.js'
+import { ALLOWED_SYMMETRIC_ALGORITHMS } from '../constants.js'
 
 export class SymmetricDriver implements JwtDriver {
   readonly canSign = true
@@ -17,11 +17,11 @@ export class SymmetricDriver implements JwtDriver {
     clockTolerance?: number
   }) {
     if (!options.secret) {
-      throw new Error('Symmetric JWT driver requires a secret key')
+      throw new Error('JWT guard requires a `secret`')
     }
     if (options.secret.length < 32) {
       throw new Error(
-        'Symmetric JWT driver requires a secret of at least 32 characters to ensure sufficient entropy'
+        'JWT guard `secret` must be at least 32 characters to ensure sufficient entropy'
       )
     }
     this.#secret = options.secret

@@ -5,7 +5,8 @@ import type { Options } from 'jwks-rsa'
 import type { StringValue } from 'ms'
 import { JwksManager } from '../jwks.js'
 import type { JwtDriver } from './types.js'
-import { ALLOWED_JWKS_ALGORITHMS, type JwtJwksAlgorithm } from '../types.js'
+import { ALLOWED_JWKS_ALGORITHMS } from '../constants.js'
+import type { JwtJwksAlgorithm } from '../types.js'
 
 /**
  * Safe jwks-rsa defaults: tokens with an unknown `kid` trigger a JWKS
@@ -68,7 +69,7 @@ export class JwksDriver implements JwtDriver {
 
   sign(_payload: Record<string, any>, _options?: { expiresIn?: number | StringValue }): never {
     throw new RuntimeException(
-      'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+      'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
     )
   }
 

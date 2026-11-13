@@ -2,17 +2,16 @@ import { symbols, errors } from '@adonisjs/auth'
 import { RuntimeException } from '@adonisjs/core/exceptions'
 import type { AuthClientResponse, GuardContract } from '@adonisjs/auth/types'
 import type { HttpContext } from '@adonisjs/core/http'
-import {
-  DEFAULT_REFRESH_TOKEN_EXPIRES_IN,
-  DEFAULT_TOKEN_EXPIRES_IN,
-  type JwtUserProviderContract,
-  type JwtGuardOptions,
-  type JwtCookieOptions,
-  type JwtGenerateResult,
+import { DEFAULT_REFRESH_TOKEN_EXPIRES_IN, DEFAULT_TOKEN_EXPIRES_IN } from './constants.js'
+import type {
+  JwtUserProviderContract,
+  JwtGuardOptions,
+  JwtCookieOptions,
+  JwtGenerateResult,
 } from './types.js'
 import { Secret } from '@adonisjs/core/helpers'
 import type { AccessTokensUserProviderContract } from '@adonisjs/auth/types/access_tokens'
-import type { JwtDriver } from './drivers/types.js'
+import type { JwtDriver, JwtGuardInternalOptions } from './drivers/types.js'
 import {
   releaseSecrets,
   toSeconds,
@@ -33,7 +32,9 @@ export class JwtGuard<
   #refreshTokenUserProvider?: AccessTokensUserProviderContract<
     UserProvider[typeof symbols.PROVIDER_REAL_USER]
   >
-  #options: ReleasedSecrets<JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>>
+  #options: ReleasedSecrets<
+    JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]> & JwtGuardInternalOptions
+  >
   #tokenName: string
   #refreshTokenName: string = 'refreshToken'
   #driver: JwtDriver
@@ -48,7 +49,8 @@ export class JwtGuard<
   constructor(
     ctx: HttpContext,
     userProvider: UserProvider,
-    option: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]>
+    option: JwtGuardOptions<UserProvider[typeof symbols.PROVIDER_REAL_USER]> &
+      JwtGuardInternalOptions
   ) {
     this.#ctx = ctx
     this.#userProvider = userProvider
@@ -149,7 +151,7 @@ export class JwtGuard<
   ): Promise<JwtGenerateResult<WithRefreshToken>> {
     if (!this.#driver.canSign) {
       throw new RuntimeException(
-        'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+        'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
       )
     }
     const providerUser = await this.#userProvider.createUserForGuard(user)
@@ -304,7 +306,7 @@ export class JwtGuard<
 
     if (!this.#driver.canSign) {
       throw new RuntimeException(
-        'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
+        'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
       )
     }
 
@@ -507,7 +509,7 @@ export class JwtGuard<
 }
 
 const REFRESH_TOKENS_NOT_CONFIGURED =
-  'Refresh tokens are not configured: set `refreshTokenUserProvider` in the JWT guard config'
+  'JWT guard refresh tokens are not configured: set `refreshTokenUserProvider` in the guard config'
 
 function isUserId(value: unknown): value is string | number | bigint {
   return (

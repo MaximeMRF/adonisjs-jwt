@@ -199,7 +199,7 @@ test.group('Jwt guard | JWKS', (group) => {
 
     await assert.rejects(async () => {
       await guard.generate(user!.getOriginal())
-    }, 'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider')
+    }, 'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider')
   })
 
   test('should throw error when calling generateWithRefreshToken with jwks enabled', async ({
@@ -216,7 +216,7 @@ test.group('Jwt guard | JWKS', (group) => {
 
     await assert.rejects(async () => {
       await guard.generateWithRefreshToken()
-    }, 'The JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider')
+    }, 'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider')
   })
 
   test('should return the jwks client', async ({ assert }) => {
