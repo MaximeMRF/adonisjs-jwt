@@ -23,7 +23,7 @@ export const DEFAULT_JWKS_OPTIONS = {
 export class JwksDriver implements JwtDriver {
   readonly canSign = false
   #jwksManager: JwksManager
-  #issuer?: string
+  #issuer: string
   #audience?: string | string[]
   #clockTolerance?: number
   #algorithms: JwtJwksAlgorithm[]
@@ -67,7 +67,7 @@ export class JwksDriver implements JwtDriver {
     this.#algorithms = algorithms
   }
 
-  sign(_payload: Record<string, any>, _options?: { expiresIn?: number | StringValue }): never {
+  sign(_payload: Record<string, any>, _options: { expiresIn: number | StringValue }): never {
     throw new RuntimeException(
       'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
     )
@@ -83,7 +83,7 @@ export class JwksDriver implements JwtDriver {
     const key = await this.#jwksManager.getSigningKey(decoded.header.kid)
     const verifyOptions: jwt.VerifyOptions = {
       algorithms: [...this.#algorithms],
-      ...(this.#issuer ? { issuer: this.#issuer } : {}),
+      issuer: this.#issuer,
       ...(this.#audience ? { audience: this.#audience as jwt.VerifyOptions['audience'] } : {}),
       ...(this.#clockTolerance !== undefined ? { clockTolerance: this.#clockTolerance } : {}),
     }

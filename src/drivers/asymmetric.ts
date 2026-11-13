@@ -66,9 +66,9 @@ export class AsymmetricDriver implements JwtDriver {
     }
   }
 
-  sign(payload: Record<string, any>, options?: { expiresIn?: number | StringValue }): string {
+  sign(payload: Record<string, any>, options: { expiresIn: number | StringValue }): string {
     const signOptions: jwt.SignOptions = {
-      ...(options?.expiresIn !== undefined ? { expiresIn: options.expiresIn } : {}),
+      expiresIn: options.expiresIn,
       algorithm: this.#algorithm,
       ...(this.#issuer ? { issuer: this.#issuer } : {}),
       ...(this.#audience ? { audience: this.#audience } : {}),

@@ -30,9 +30,9 @@ export class SymmetricDriver implements JwtDriver {
     this.#clockTolerance = options.clockTolerance
   }
 
-  sign(payload: Record<string, any>, options?: { expiresIn?: number | StringValue }): string {
+  sign(payload: Record<string, any>, options: { expiresIn: number | StringValue }): string {
     const signOptions: jwt.SignOptions = {
-      ...(options?.expiresIn !== undefined ? { expiresIn: options.expiresIn } : {}),
+      expiresIn: options.expiresIn,
       ...(this.#issuer ? { issuer: this.#issuer } : {}),
       ...(this.#audience ? { audience: this.#audience } : {}),
     }

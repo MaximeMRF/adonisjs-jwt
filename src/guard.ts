@@ -85,7 +85,7 @@ export class JwtGuard<
   }
 
   #signAccessToken(payload: Record<string, any>) {
-    return this.#driver.sign(payload, { expiresIn: this.#options.tokenExpiresIn })
+    return this.#driver.sign(payload, { expiresIn: this.#options.tokenExpiresIn! })
   }
 
   async #verifyAccessToken(token: string) {
@@ -164,11 +164,10 @@ export class JwtGuard<
       const generatedRefreshToken = await this.#refreshTokenUserProvider.createToken(
         user,
         this.#options.refreshTokenAbilities ?? [],
-        this.#options.refreshTokenExpiresIn
-          ? {
-              expiresIn: this.#options.refreshTokenExpiresIn,
-            }
-          : undefined
+        /**
+         * Always set when there is a refresh token provider (7 days by default)
+         */
+        { expiresIn: this.#options.refreshTokenExpiresIn! }
       )
       refreshToken = generatedRefreshToken.value!.release()
       this.#issuedRefreshToken = refreshToken

@@ -28,7 +28,7 @@ test.group('JWT Drivers', () => {
   test('SymmetricDriver should sign and verify correctly', ({ assert }) => {
     const driver = new SymmetricDriver({ secret: 'this-is-a-secret-with-32-chars!!' })
     const payload = { userId: 1 }
-    const token = driver.sign(payload)
+    const token = driver.sign(payload, { expiresIn: '1h' })
     assert.exists(token)
 
     const verified = driver.verify(token) as any
@@ -62,7 +62,7 @@ test.group('JWT Drivers', () => {
       { issuer: 'jwks-issuer', audience: 'jwks-audience' }
     )
     assert.throws(
-      () => driver.sign({ userId: 1 }),
+      () => driver.sign({ userId: 1 }, { expiresIn: '1h' }),
       'JWT guard cannot issue tokens in JWKS mode: tokens are issued by the identity provider'
     )
   })
