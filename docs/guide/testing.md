@@ -35,3 +35,7 @@ test('returns the current user', async ({ client }) => {
 ```
 
 `loginAs` issues an access token for the user and sends it in the `Authorization` header. To use the JWT guard when it isn't the default one, name it: `.withGuard('jwt').loginAs(user)`.
+
+::: info Browser tests
+The browser client of `@adonisjs/auth` (`browserContext.loginAs`) isn't supported: it expects cookies, and the guard returns a header. In browser tests, log in through your login form.
+:::

@@ -97,4 +97,4 @@ After [`generateWithRefreshToken()`](/guide/refresh-tokens), it holds the new ac
 
 ## Log out
 
-Access tokens are stateless: they stay valid until they expire. Logging out revokes the refresh token and clears the cookies set by the guard, see [Revoking tokens](/guide/refresh-tokens#revoke-a-refresh-token).
+Access tokens are stateless: they stay valid until they expire. Logging out revokes the refresh token and clears the cookies set by the guard, see [Revoking tokens](/guide/refresh-tokens#revoke-a-refresh-token). The client must send its refresh token, not only its access token, see [Single-page apps](/guide/spa#log-out) and [Inertia](/guide/inertia#log-in-and-log-out).
