@@ -1248,6 +1248,47 @@ test.group('Security | the app key mode validates the options at startup', (grou
   })
 })
 
+test.group('Security | content must not set the claims of the guard', () => {
+  test('a content that sets {claim} gets a clear error, not the jsonwebtoken one')
+    .with([
+      { claim: 'exp', options: {}, content: { exp: 4102444800 }, option: 'tokenExpiresIn' },
+      { claim: 'iss', options: { issuer: 'my-app' }, content: { iss: 'other' }, option: 'issuer' },
+      {
+        claim: 'aud',
+        options: { audience: 'my-api' },
+        content: { aud: 'other' },
+        option: 'audience',
+      },
+    ])
+    .run(async ({ assert }, { claim, options, content, option }) => {
+      // e.g. a content written for 0.9, where tokens had no default lifetime
+      const userProvider = new JwtFakeUserProvider()
+      const user = await userProvider.findById(1)
+      const guard = new JwtGuard(new HttpContextFactory().create(), userProvider, {
+        secret: TEST_SECRET,
+        ...options,
+        content: (u) => ({ userId: u.getId(), ...content }) as any,
+      })
+
+      await assert.rejects(
+        () => guard.generate(user!.getOriginal()),
+        `JWT guard \`content\` must not set \`${claim}\`: the guard sets it from \`${option}\``
+      )
+    })
+
+  test('content may set iss and aud when the guard does not', async ({ assert }) => {
+    const userProvider = new JwtFakeUserProvider()
+    const user = await userProvider.findById(1)
+    const guard = new JwtGuard(new HttpContextFactory().create(), userProvider, {
+      secret: TEST_SECRET,
+      content: (u) => ({ userId: u.getId(), iss: 'my-app', aud: 'my-api' }),
+    })
+
+    const { token } = await guard.generate(user!.getOriginal())
+    assert.include(jwt.decode(token) as object, { iss: 'my-app', aud: 'my-api' })
+  })
+})
+
 test.group('Security | check() only hides authentication failures', () => {
   class DatabaseDownProvider extends JwtFakeUserProvider {
     async findById(): Promise<never> {

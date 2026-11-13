@@ -149,6 +149,14 @@ type JwtSharedOptions = {
 }
 
 /**
+ * Claims set by the guard: `exp` comes from `tokenExpiresIn`, so `content`
+ * must not set it
+ */
+type GuardClaims = {
+  exp?: never
+}
+
+/**
  * `content` builds the payload of the access tokens. Without `getUserId`,
  * the guard reads the user id from the `userId` claim, so `content` must
  * set it. With `getUserId`, `content` is free to use another claim.
@@ -160,7 +168,7 @@ export type JwtContentOptions<RealUser> =
        * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
        */
       getUserId?: undefined
-      content?: (user: JwtGuardUser<RealUser>) => Record<string, any> & BaseJwtContent
+      content?: (user: JwtGuardUser<RealUser>) => Record<string, any> & BaseJwtContent & GuardClaims
     }
   | {
       /**
@@ -168,7 +176,7 @@ export type JwtContentOptions<RealUser> =
        * Defaults to `payload.userId`. Use e.g. `(payload) => payload.sub` for external providers.
        */
       getUserId: JwtGetUserId
-      content?: (user: JwtGuardUser<RealUser>) => Record<string, any>
+      content?: (user: JwtGuardUser<RealUser>) => Record<string, any> & GuardClaims
     }
 
 /**
