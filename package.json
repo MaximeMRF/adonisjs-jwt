@@ -1,7 +1,7 @@
 {
   "name": "@maximemrf/adonisjs-jwt",
-  "description": "AdonisJS package for authentication with JWT tokens",
-  "version": "1.0.0-rc.8",
+  "description": "JWT authentication guard for AdonisJS: access tokens, rotating refresh tokens, HttpOnly cookies, RSA/ECDSA keys and JWKS",
+  "version": "1.0.0",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -92,11 +92,19 @@
   "keywords": [
     "adonisjs",
     "adonis",
-    "jwt",
+    "adonisjs7",
+    "auth",
     "authentication",
-    "jwks",
+    "guard",
+    "jwt",
+    "access token",
     "refresh token",
-    "cookies"
+    "bearer",
+    "cookies",
+    "jwks",
+    "oidc",
+    "rsa",
+    "ecdsa"
   ],
   "eslintConfig": {
     "extends": "@adonisjs/eslint-config/package"
