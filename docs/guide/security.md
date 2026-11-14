@@ -5,7 +5,7 @@
 When no `secret` is configured, the guard signs tokens with a key derived from the AdonisJS application key, with HKDF-SHA256 salted with the guard name. You don't have to manage a separate secret, and:
 
 - the raw application key is never used to sign JWTs, so values signed elsewhere with the application key (signed URLs, cookies…) are not accepted as access tokens;
-- two JWT guards never accept each other's tokens.
+- two JWT guards never accept each other's access tokens. Refresh tokens are stored by their tokens provider, so they need a `type` per guard: see [Several JWT guards](/guide/refresh-tokens#several-jwt-guards).
 
 The application key is read from `appKey` in `config/app.ts` when it exists (apps created with AdonisJS v6), otherwise from the `APP_KEY` environment variable. It must be at least 32 characters, otherwise the guard throws at startup.
 

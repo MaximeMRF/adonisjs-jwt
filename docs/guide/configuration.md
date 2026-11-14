@@ -66,7 +66,7 @@ Don't set `exp` in `content`, use `tokenExpiresIn`: TypeScript rejects it, and `
 
 ## Signing key
 
-Without `secret`, the guard derives its signing key from the application key, which must be at least 32 characters. Each guard derives its own key, so two JWT guards never accept each other's tokens. See [Security](/guide/security#signing-key) for details.
+Without `secret`, the guard derives its signing key from the application key, which must be at least 32 characters. Each guard derives its own key, so two JWT guards never accept each other's access tokens (for refresh tokens, see [Several JWT guards](/guide/refresh-tokens#several-jwt-guards)). See [Security](/guide/security#signing-key) for details.
 
 To sign with your own secret instead, for example to verify tokens in another service, set `secret`. It must be at least 32 characters:
 
@@ -97,7 +97,7 @@ In [JWKS](/guide/jwks) mode, `issuer` is required, and so is `audience` unless [
 
 ## Full example
 
-A configuration with refresh tokens and cookies, next to the session guard:
+A configuration with refresh tokens and cookies, next to the session guard. It makes the JWT guard the default one; in an app whose pages use the session guard, keep `default: 'web'` and protect the API routes with `middleware.auth({ guards: ['jwt'] })`:
 
 ```ts
 // config/auth.ts
