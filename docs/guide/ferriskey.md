@@ -2,7 +2,7 @@
 
 [FerrisKey](https://ferriskey.rs) is an open-source identity and access management server, with realms, clients, users, roles and standard OpenID Connect flows. Your AdonisJS API can verify the tokens it issues in [JWKS](/guide/jwks) mode, without sharing any secret.
 
-This guide was tested end to end against FerrisKey v0.9.0, with tokens issued by the `client_credentials` grant.
+This guide was tested end to end against FerrisKey v0.10.2, with tokens issued by the `client_credentials` grant.
 
 ## Find the endpoints
 
@@ -14,6 +14,8 @@ Each realm publishes its discovery document at `https://<ferriskey-host>/api/rea
 | `jwks_uri`      | `https://auth.example.com/api/realms/my-realm/protocol/openid-connect/jwks.json` | `jwks.jwksUri` |
 
 FerrisKey signs tokens with `RS256`.
+
+The examples use the `/api` root path of the FerrisKey Helm chart. Without a root path (`SERVER_ROOT_PATH`), for example with the `docker-compose.yaml` of the FerrisKey repository, the URLs start at `/realms/<realm>`. Copy `issuer` and `jwks_uri` from your discovery document rather than building them by hand.
 
 ## Create a client
 
@@ -27,7 +29,7 @@ Then enable the **service account** of the client, and copy the **client secret*
 
 ## Add an audience
 
-By default, FerrisKey puts generic values in the `aud` claim, for example `["my-realm", "account"]`, and the client that requested the token in `azp`. Every token of the realm carries these values: with `audience: 'account'`, your API would accept tokens issued for any other client of the realm.
+By default, FerrisKey puts generic values in the `aud` claim, for example `["my-realm-realm", "account"]`, and the client that requested the token in `azp`. Every token of the realm carries these values: with `audience: 'account'`, your API would accept tokens issued for any other client of the realm.
 
 Add an audience mapper so tokens carry an audience specific to your API:
 
@@ -43,10 +45,10 @@ New tokens now contain your audience:
 ```json
 {
   "iss": "https://auth.example.com/api/realms/my-realm",
-  "aud": ["my-realm", "account", "my-api"],
+  "aud": ["my-realm-realm", "account", "my-api"],
   "azp": "my-api",
   "sub": "01a126dd-bb20-70c2-b722-2a64312f84f2",
-  "scope": "openid my-api-audience email profile roles"
+  "scope": "openid email my-api-audience organization profile roles"
 }
 ```
 
@@ -55,6 +57,12 @@ Make sure you're in the right realm in the console: a client scope created in `m
 :::
 
 Without an audience mapper, you can instead check the client that requested the token, in `azp`, with [`verifyPayload`](/guide/jwks#check-other-claims) in place of `audience`. This was tested against FerrisKey too, but the audience mapper is the standard way.
+
+### The `resource` parameter
+
+Since v0.10, FerrisKey also accepts the `resource` parameter ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)) on the `client_credentials` and `password` grants. List your API in the `allowed_resources` of the realm settings, then request a token with `-d resource=https://api.example.com`: the token's `aud` is exactly `["https://api.example.com"]`, and set `audience: 'https://api.example.com'` in the guard. A resource that isn't allowed is refused with `invalid_target`.
+
+`allowed_resources` applies to the whole realm: **every client of the realm** can request a token for your API. With the audience mapper, only the clients the scope is assigned to get your audience. If you use `resource`, also check `azp` with `verifyPayload` to restrict which clients may call your API.
 
 ## Configure the guard
 
