@@ -1,3 +1,7 @@
+---
+description: "Verify tokens from an identity provider in AdonisJS with JWKS: issuer, audience, allowed algorithms, key caching and rotation."
+---
+
 # JWKS
 
 In JWKS mode, the guard doesn't issue tokens: it verifies tokens signed by an external identity provider (Auth0, Keycloak, Cognito, Kubernetes…), using the public keys the provider publishes as a [JSON Web Key Set](https://datatracker.ietf.org/doc/html/rfc7517).

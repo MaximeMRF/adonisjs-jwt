@@ -1,3 +1,7 @@
+---
+description: "What the AdonisJS JWT guard does, how it fits into @adonisjs/auth, and when to use JWT access tokens instead of sessions or opaque tokens."
+---
+
 # Introduction
 
 `@maximemrf/adonisjs-jwt` is an authentication guard for [AdonisJS](https://adonisjs.com) that issues and verifies JWT access tokens. It plugs into [`@adonisjs/auth`](https://docs.adonisjs.com/guides/authentication/introduction), so you protect routes with the `auth` middleware and read the user with `auth.getUserOrFail()`, like with the built-in guards.

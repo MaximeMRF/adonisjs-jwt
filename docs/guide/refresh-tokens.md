@@ -1,3 +1,7 @@
+---
+description: "Rotating refresh tokens for AdonisJS JWT: database table, refresh endpoint, abilities, revocation on logout and several JWT guards."
+---
+
 # Refresh tokens
 
 Short-lived access tokens limit the damage of a leaked token, but force users to log in again often. Refresh tokens solve this: the client exchanges a long-lived refresh token for a new access token when the old one expires.

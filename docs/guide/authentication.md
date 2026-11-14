@@ -1,3 +1,7 @@
+---
+description: "Log users in with JWT in AdonisJS: issue access tokens, protect routes with the auth middleware and read the authenticated user."
+---
+
 # Authentication
 
 ## Issue a token

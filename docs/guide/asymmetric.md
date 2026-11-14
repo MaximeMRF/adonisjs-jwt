@@ -1,3 +1,7 @@
+---
+description: "Sign AdonisJS JWT access tokens with RSA or ECDSA keys (RS256, ES256) so other services can verify them with the public key."
+---
+
 # Asymmetric signing
 
 With asymmetric signing, the guard signs access tokens with a **private key** and verifies them with the matching **public key**. Other services can verify your tokens with the public key alone, without being able to issue tokens.

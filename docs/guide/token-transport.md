@@ -1,3 +1,7 @@
+---
+description: "Send AdonisJS JWT tokens in the Authorization header or in HttpOnly cookies, with SameSite, CSRF protection and cookie options."
+---
+
 # Cookies and token transport
 
 The access token and the refresh token can travel in the `Authorization` header, in cookies, or in the request body for the refresh token.

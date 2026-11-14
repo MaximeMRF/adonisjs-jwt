@@ -1,3 +1,7 @@
+---
+description: "Use AdonisJS JWT with Inertia and server-rendered apps: cookie tokens, login and logout controllers, and redirects to the login page."
+---
+
 # Inertia and server-rendered apps
 
 In an Inertia or server-rendered app, the pages and the API usually share the same domain. The AdonisJS [session guard](https://docs.adonisjs.com/guides/authentication/session-guard), which the starter kits configure, is then the simplest choice for the pages. A common setup keeps the session guard for the pages and adds the JWT guard for an `/api` section used by a mobile app or another service.

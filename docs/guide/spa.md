@@ -1,3 +1,7 @@
+---
+description: "Use AdonisJS JWT with a single-page app: cookies across subdomains, CORS with credentials, and a fetch wrapper that refreshes once."
+---
+
 # Single-page apps
 
 A single-page app (React, Vue, Svelte…) served from another origin than the API can keep the tokens in memory and send them in the `Authorization` header, or let the browser store them in `HttpOnly` cookies. This page covers what the browser adds on top of [Cookies and token transport](/guide/token-transport).

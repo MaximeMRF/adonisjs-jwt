@@ -1,3 +1,7 @@
+---
+description: "API reference of the AdonisJS JWT guard: generate, authenticate, check, generateWithRefreshToken, revoke and the user provider contract."
+---
+
 # Guard API
 
 Methods and properties of the guard returned by `auth.use('jwt')`.

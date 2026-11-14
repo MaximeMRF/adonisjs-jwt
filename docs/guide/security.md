@@ -1,3 +1,7 @@
+---
+description: "Security model of the AdonisJS JWT guard: signing key derivation, secret strength, stateless access tokens and refresh token replay."
+---
+
 # Security
 
 ## Signing key

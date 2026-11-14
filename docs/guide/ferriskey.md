@@ -1,3 +1,7 @@
+---
+description: "Authenticate an AdonisJS API with FerrisKey tokens through JWKS: client, audience mapper, guard configuration and client_credentials."
+---
+
 # FerrisKey
 
 [FerrisKey](https://ferriskey.rs) is an open-source identity and access management server, with realms, clients, users, roles and standard OpenID Connect flows. Your AdonisJS API can verify the tokens it issues in [JWKS](/guide/jwks) mode, without sharing any secret.

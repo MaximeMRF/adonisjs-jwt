@@ -1,4 +1,5 @@
 ---
+description: "JWT authentication for AdonisJS: an auth guard with access tokens, rotating refresh tokens, HttpOnly cookies, RSA/ECDSA keys and JWKS verification."
 layout: home
 
 hero:

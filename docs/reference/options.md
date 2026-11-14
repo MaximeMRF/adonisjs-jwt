@@ -1,3 +1,7 @@
+---
+description: "Every option of the AdonisJS JWT guard: secret, keys, JWKS, lifetimes, cookies, refresh tokens, content, getUserId and verifyPayload."
+---
+
 # Options
 
 Options of `jwtGuard()`, in `config/auth.ts`.

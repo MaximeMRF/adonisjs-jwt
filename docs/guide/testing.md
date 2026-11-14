@@ -1,3 +1,7 @@
+---
+description: "Test AdonisJS routes protected by the JWT guard with Japa: loginAs with the API client, and the session guard alongside."
+---
+
 # Testing
 
 The guard supports the `loginAs` method of the Japa [API client](https://docs.adonisjs.com/guides/testing/http-tests), through the auth plugin of `@adonisjs/auth`.

@@ -1,3 +1,7 @@
+---
+description: "Authenticate services in Kubernetes with ServiceAccount tokens verified by an AdonisJS API in JWKS mode, without any shared secret."
+---
+
 # Kubernetes ServiceAccount tokens
 
 Services running in a Kubernetes cluster can authenticate against your API with their ServiceAccount token, without any shared secret. The API server signs these tokens and publishes its public keys, so the guard can verify them in [JWKS](/guide/jwks) mode.

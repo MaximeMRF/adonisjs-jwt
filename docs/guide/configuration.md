@@ -1,3 +1,7 @@
+---
+description: "Configure the AdonisJS JWT guard: token lifetime, payload, signing key, issuer and audience, next to the session guard."
+---
+
 # Configuration
 
 Register the guard in `config/auth.ts`. The smallest configuration only needs a user provider:

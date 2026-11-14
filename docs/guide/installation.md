@@ -1,3 +1,7 @@
+---
+description: "Install @maximemrf/adonisjs-jwt in an AdonisJS v7 app and configure the JWT guard and the refresh tokens table with node ace configure."
+---
+
 # Installation
 
 ## Prerequisites
