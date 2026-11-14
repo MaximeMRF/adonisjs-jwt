@@ -186,7 +186,7 @@ jwt_admin: jwtGuard({
 }),
 ```
 
-When both guards use cookies, also give them distinct `tokenName` and `refreshTokenName`, otherwise they write the same cookies.
+When both guards use cookies, also give them distinct `tokenName` and `refreshTokenName`, otherwise they write the same cookies. `refreshTokenName` also names the request body field: with the config above, a client sends its refresh token to the `jwt_admin` guard as `{ "adminRefreshToken": "..." }`, or in the `Authorization` header.
 
 ## Revoke a refresh token
 
