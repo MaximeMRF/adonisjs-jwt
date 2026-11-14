@@ -19,7 +19,6 @@ jwtGuard({
   provider: new ServiceAccountUserProvider(),
   jwks: {
     jwksUri: 'https://kubernetes.default.svc/openid/v1/jwks',
-    cache: true,
     fetcher: (uri) =>
       new Promise((resolve, reject) => {
         https
@@ -65,7 +64,7 @@ The issuer depends on your cluster. `https://kubernetes.default.svc.cluster.loca
 kubectl get --raw /.well-known/openid-configuration
 ```
 
-Legacy Secret-based ServiceAccount tokens (issuer `kubernetes/serviceaccount`, no expiration) are rejected by the `issuer` check.
+Legacy Secret-based ServiceAccount tokens (issuer `kubernetes/serviceaccount`) are rejected twice: by the `issuer` check, and because they have no `exp` claim, which the guard requires.
 
 ## Send the token from a pod
 
