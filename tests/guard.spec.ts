@@ -1048,3 +1048,37 @@ test.group('Jwt guard | token sources', () => {
     assert.isFalse(guard.isAuthenticated)
   })
 })
+
+test.group('Jwt guard | content without userId', () => {
+  test('generate fails with a clear error when content has no userId', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    // without type checking (e.g. `node ace serve`), nothing stops this config
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      content: ((user: JwtGuardUser<JwtAuthFakeUser>) => ({ sub: String(user.getId()) })) as any,
+    })
+    const user = await userProvider.findById(1)
+
+    await assert.rejects(
+      () => guard.generate(user!.getOriginal()),
+      'JWT guard `content` must return `userId`, or set `getUserId` to read the user id from the payload'
+    )
+  })
+
+  test('content may omit userId when getUserId is set', async ({ assert }) => {
+    const ctx = new HttpContextFactory().create()
+    const userProvider = new JwtFakeUserProvider()
+    const guard = new JwtGuard(ctx, userProvider, {
+      secret: TEST_SECRET,
+      getUserId: (payload) => Number(payload.sub),
+      content: (user) => ({ sub: String(user.getId()) }),
+    })
+    const user = await userProvider.findById(1)
+    const { token } = await guard.generate(user!.getOriginal())
+
+    ctx.request.request.headers.authorization = `Bearer ${token}`
+    const authenticated = await guard.authenticate()
+    assert.equal(authenticated.id, 1)
+  })
+})

@@ -229,4 +229,59 @@ test.group('Jwt guard | validation and error cases', () => {
       /JWT guard asymmetric key validation failed/
     )
   })
+  test('rejects at boot an EC key whose curve does not match the algorithm', async ({ assert }) => {
+    const { publicKey, privateKey } = generateKeyPairSync('ec', {
+      namedCurve: 'secp384r1',
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    })
+    const ctx = new HttpContextFactory().create()
+
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, new JwtFakeUserProvider(), { privateKey, publicKey, algorithm: 'ES256' }),
+      /JWT guard asymmetric key validation failed: .*ES256/
+    )
+  })
+
+  test('rejects at boot an RSA key shorter than 2048 bits', async ({ assert }) => {
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 1024,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    })
+    const ctx = new HttpContextFactory().create()
+
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, new JwtFakeUserProvider(), { privateKey, publicKey, algorithm: 'RS256' }),
+      /JWT guard asymmetric key validation failed: .*2048 bits/
+    )
+  })
+
+  test('explains how to fix a PEM key read from an env variable with literal \\n', async ({
+    assert,
+  }) => {
+    const { publicKey, privateKey } = rsaPemPair()
+    const ctx = new HttpContextFactory().create()
+
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, new JwtFakeUserProvider(), {
+          privateKey: privateKey.replaceAll('\n', '\\n'),
+          publicKey,
+          algorithm: 'RS256',
+        }),
+      /privateKey is not a valid PEM key .*replace the literal "\\n" with line breaks/
+    )
+    assert.throws(
+      () =>
+        new JwtGuard(ctx, new JwtFakeUserProvider(), {
+          privateKey,
+          publicKey: publicKey.replaceAll('\n', '\\n'),
+          algorithm: 'RS256',
+        }),
+      /publicKey is not a valid PEM key/
+    )
+  })
 })
