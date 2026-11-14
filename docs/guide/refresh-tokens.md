@@ -138,7 +138,7 @@ A refresh token in the query string is ignored. You can also pass the token your
 
 ## Refresh token abilities
 
-`refreshTokenAbilities` sets the abilities given to new refresh tokens. When it is set, `generateWithRefreshToken()` rejects refresh tokens that don't have all of them:
+`refreshTokenAbilities` sets the abilities given to new refresh tokens. When it is set, `generateWithRefreshToken()` and `revoke()` reject refresh tokens that don't have all of them:
 
 ```ts
 jwtGuard({
@@ -148,6 +148,45 @@ jwtGuard({
 ```
 
 This guards against a misconfiguration where `refreshTokenUserProvider` points to a provider that also stores other tokens. The token `type` remains the main protection.
+
+## Several JWT guards
+
+Access tokens are signed with a key per guard, but refresh tokens are looked up by their tokens provider: two guards that share one accept each other's refresh tokens, to refresh and to log out. Give each guard its own provider, with a distinct `type`. They can share the table, `@adonisjs/auth` filters every query by `type`:
+
+```ts
+// app/models/user.ts
+static refreshTokens = DbAccessTokensProvider.forModel(User, {
+  table: 'jwt_refresh_tokens',
+  type: 'jwt_refresh_token',
+})
+
+static adminRefreshTokens = DbAccessTokensProvider.forModel(User, {
+  table: 'jwt_refresh_tokens',
+  type: 'jwt_admin_refresh_token',
+})
+```
+
+```ts
+// config/auth.ts
+jwt: jwtGuard({
+  // ...
+  refreshTokenUserProvider: tokensUserProvider({
+    tokens: 'refreshTokens',
+    model: () => import('#models/user'),
+  }),
+}),
+jwt_admin: jwtGuard({
+  // ...
+  refreshTokenUserProvider: tokensUserProvider({
+    tokens: 'adminRefreshTokens',
+    model: () => import('#models/user'),
+  }),
+  tokenName: 'adminToken',
+  refreshTokenName: 'adminRefreshToken',
+}),
+```
+
+When both guards use cookies, also give them distinct `tokenName` and `refreshTokenName`, otherwise they write the same cookies.
 
 ## Revoke a refresh token
 
@@ -162,7 +201,7 @@ router.post('logout', async ({ auth }) => {
 
 It accepts the refresh token as argument: `revoke(token)`. Otherwise it revokes the refresh token issued earlier in the same request, if any (for example by a middleware that refreshed an expired access token), or else reads it from the request like `generateWithRefreshToken()`.
 
-The cookies are always cleared. When no valid refresh token is found (none sent, unknown, already revoked), nothing is revoked and `revoke()` throws `E_UNAUTHORIZED_ACCESS`, so the client gets a `401` instead of believing it has logged out.
+The cookies are cleared when the refresh token is revoked, and when no valid refresh token is found (none sent, unknown, already revoked). In that case nothing is revoked and `revoke()` throws `E_UNAUTHORIZED_ACCESS`, so the client gets a `401` instead of believing it has logged out. On any other error, for example when the database is down, the error is thrown and the cookies are kept, so the client can log out again later.
 
 ::: warning Bearer clients
 A client that keeps its tokens in memory must send its **refresh token** on logout, in the body or the `Authorization` header. If it only sends its access token, the logout fails with a `401` and the refresh token stays valid.

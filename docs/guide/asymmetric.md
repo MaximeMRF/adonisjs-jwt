@@ -35,9 +35,17 @@ jwtGuard({
 })
 ```
 
-The `.replace()` restores the line breaks of PEM keys stored on a single line in `.env`.
+The `.replace()` restores the line breaks of PEM keys stored on a single line in `.env`. Declare the variables in `start/env.ts`:
 
-The guard checks at startup that the keys are valid, match the algorithm, and belong to the same key pair. It throws if only some of the three options are set.
+```ts
+// start/env.ts
+JWT_PRIVATE_KEY: Env.schema.string(),
+JWT_PUBLIC_KEY: Env.schema.string(),
+```
+
+With `Env.schema.secret()`, `env.get()` returns a `Secret`: call `.release()` before `.replace()`, as in `env.get('JWT_PRIVATE_KEY').release().replace(/\\n/g, '\n')`.
+
+The guard checks at startup that the keys are valid, match the algorithm (including the curve of ECDSA keys and RSA keys of at least 2048 bits), and belong to the same key pair. It throws if only some of the three options are set.
 
 Notes:
 
@@ -57,6 +65,11 @@ const payload = jwt.verify(token, publicKey, {
   issuer: 'my-app',
   audience: 'my-api',
 })
+
+// jsonwebtoken checks `exp` only when it is present
+if (typeof payload === 'string' || payload.exp === undefined) {
+  throw new Error('Token without expiration')
+}
 ```
 
-Always pin `algorithms`. If the other service is an AdonisJS application, you can also expose the public key as a JWKS and use the [JWKS mode](/guide/jwks).
+Always pin `algorithms`, and require `exp`: the guard always sets it, so a token without it was not issued by the guard. With [`jose`](https://github.com/panva/jose), pass `requiredClaims: ['exp']` to `jwtVerify()`. If the other service is an AdonisJS application, you can also expose the public key as a JWKS and use the [JWKS mode](/guide/jwks).

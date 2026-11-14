@@ -48,6 +48,8 @@ In the starter kit controllers, replace the session login with `generate()`, whi
 
 ```ts
 // app/controllers/session_controller.ts
+import { errors } from '@adonisjs/auth' // [!code ++]
+
 async store({ request, auth, response }: HttpContext) {
   const { email, password } = await request.validateUsing(loginValidator)
   const user = await User.verifyCredentials(email, password)
@@ -68,7 +70,7 @@ async destroy({ auth, response }: HttpContext) {
 
 Do the same in the signup controller.
 
-`revoke()` throws a `401` when the request has no valid refresh token, for example when it has expired. On a page, the user wants to be logged out anyway: the `try/catch` ignores this `401` (import `errors` from `@adonisjs/auth`), `revoke()` has already cleared the cookies, and the user is redirected to the login page. Without it, Inertia shows "Unauthorized access" in its error modal.
+`revoke()` throws a `401` when the request has no valid refresh token, for example when it has expired. On a page, the user wants to be logged out anyway: the `try/catch` ignores this `401`, `revoke()` has already cleared the cookies, and the user is redirected to the login page. Without it, Inertia shows "Unauthorized access" in its error modal.
 
 Only ignore `E_UNAUTHORIZED_ACCESS`. An empty `catch {}` would also hide a database outage: the user would be redirected as if logged out, while their refresh token stays valid, and nothing would be logged.
 

@@ -1693,3 +1693,127 @@ test.group('Security | lifetimes in the generate() result are in seconds', () =>
     assert.strictEqual(result.refreshTokenExpiresIn, 7 * 24 * 60 * 60)
   })
 })
+
+test.group('Security | revoke (rc.8)', () => {
+  test('revoke rejects a refresh token missing the configured abilities and keeps it valid', async ({
+    assert,
+  }) => {
+    const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const ctx = new HttpContextFactory().create()
+
+    const guard = new JwtGuard(ctx, new JwtFakeUserProvider(), {
+      secret: TEST_SECRET,
+      refreshTokenAbilities: ['admin_refresh'],
+      refreshTokenUserProvider,
+    })
+
+    // a refresh token issued by another guard sharing the same provider
+    const otherGuardToken = await User.refreshTokens.create(user, ['user_refresh'])
+
+    await assert.rejects(
+      () => guard.revoke(otherGuardToken.value!.release()),
+      errors.E_UNAUTHORIZED_ACCESS
+    )
+    assert.isNotNull(await User.refreshTokens.verify(otherGuardToken.value!))
+  })
+
+  test('revoke keeps the cookies when the revocation fails with a non-401 error', async ({
+    assert,
+  }) => {
+    const { User, user, refreshTokenUserProvider } = await setupRefreshTokens()
+    const ctx = new HttpContextFactory().create()
+
+    const guard = new JwtGuard(ctx, new JwtFakeUserProvider(), {
+      secret: TEST_SECRET,
+      useCookies: true,
+      useCookiesForRefreshToken: true,
+      refreshTokenUserProvider,
+    })
+
+    const refreshToken = await User.refreshTokens.create(user)
+    const value = refreshToken.value!.release()
+    const invalidateToken = refreshTokenUserProvider.invalidateToken.bind(refreshTokenUserProvider)
+    refreshTokenUserProvider.invalidateToken = async () => {
+      throw new Error('database is down')
+    }
+
+    await assert.rejects(() => guard.revoke(value), 'database is down')
+    assert.isUndefined(ctx.response.getHeader('set-cookie'))
+
+    // once the database is back, the client can retry the logout
+    refreshTokenUserProvider.invalidateToken = invalidateToken
+    await guard.revoke(value)
+    assert.isNull(await User.refreshTokens.verify(new Secret(value)))
+    const setCookie = ctx.response.getHeader('set-cookie') as string[]
+    assert.isTrue(setCookie.some((c) => c.startsWith('refreshToken=;') && c.includes('Max-Age=0')))
+  })
+
+  test('two guards with a distinct token type do not accept each other refresh tokens', async ({
+    assert,
+  }) => {
+    const db = await createDatabase()
+    await createTables(db)
+
+    class User extends BaseModel {
+      @column({ isPrimary: true })
+      declare id: number
+      @column()
+      declare username: string
+      @column()
+      declare email: string
+      @column()
+      declare password: string
+      // same table, one `type` per guard
+      static refreshTokens = DbAccessTokensProvider.forModel(User, {
+        table: 'jwt_refresh_tokens',
+        type: 'jwt_refresh_token',
+      })
+      static adminRefreshTokens = DbAccessTokensProvider.forModel(User, {
+        table: 'jwt_refresh_tokens',
+        type: 'jwt_admin_refresh_token',
+      })
+    }
+    const model = async () => ({ default: User })
+    const user = await User.create({
+      email: 'two_guards@example.com',
+      username: 'two_guards',
+      password: 'password',
+    })
+
+    const makeGuards = () => {
+      const ctx = new HttpContextFactory().create()
+      return {
+        jwt: new JwtGuard(ctx, new JwtFakeUserProvider(), {
+          secret: TEST_SECRET,
+          refreshTokenUserProvider: tokensUserProvider({ tokens: 'refreshTokens', model }),
+        }),
+        admin: new JwtGuard(ctx, new JwtFakeUserProvider(), {
+          secret: TEST_SECRET,
+          refreshTokenUserProvider: tokensUserProvider({ tokens: 'adminRefreshTokens', model }),
+        }),
+      }
+    }
+
+    const userRefreshToken = await User.refreshTokens.create(user)
+    const adminRefreshToken = await User.adminRefreshTokens.create(user)
+    const userToken = userRefreshToken.value!.release()
+    const adminToken = adminRefreshToken.value!.release()
+
+    let guards = makeGuards()
+    await assert.rejects(
+      () => guards.admin.generateWithRefreshToken(userToken),
+      'Unauthorized access'
+    )
+    await assert.rejects(
+      () => guards.jwt.generateWithRefreshToken(adminToken),
+      'Unauthorized access'
+    )
+    await assert.rejects(() => guards.admin.revoke(userToken), errors.E_UNAUTHORIZED_ACCESS)
+    await assert.rejects(() => guards.jwt.revoke(adminToken), errors.E_UNAUTHORIZED_ACCESS)
+
+    // both tokens are still valid for their own guard
+    guards = makeGuards()
+    await guards.jwt.revoke(userToken)
+    await guards.admin.revoke(adminToken)
+  })
+})

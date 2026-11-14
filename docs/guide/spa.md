@@ -80,31 +80,39 @@ The guard answers `401` with `{ "errors": [{ "message": "Unauthorized access" }]
 A refresh token can only be used once: when several requests fail at the same time with an expired access token, refresh **once** and retry them all.
 
 ```ts
+function send(path: string, init: RequestInit = {}) {
+  return fetch(`${API_URL}${path}`, {
+    ...init,
+    credentials: 'include',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', ...init.headers },
+  })
+}
+
 let refreshing: Promise<boolean> | undefined
+let refreshes = 0 // number of refreshes completed
 
 async function api(path: string, init: RequestInit = {}) {
-  const request = () =>
-    fetch(`${API_URL}${path}`, {
-      ...init,
-      credentials: 'include',
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', ...init.headers },
-    })
-
-  let response = await request()
+  const refreshesBefore = refreshes
+  let response = await send(path, init)
   if (response.status !== 401 || path === '/refresh') return response
 
-  refreshing ??= fetch(`${API_URL}/refresh`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-  })
-    .then((res) => res.ok)
-    .finally(() => (refreshing = undefined))
+  // A refresh completed while this request was in flight: its cookies are already new
+  if (refreshes !== refreshesBefore) return send(path, init)
 
-  if (await refreshing) response = await request()
+  refreshing ??= send('/refresh', { method: 'POST' })
+    .then((res) => res.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshes++
+      refreshing = undefined
+    })
+
+  if (await refreshing) response = await send(path, init)
   return response
 }
 ```
+
+Without the `refreshes` counter, a request that fails just after the refresh has completed would start a second refresh.
 
 ### With the CSRF protection of Shield
 
@@ -133,9 +141,11 @@ function send(path: string, init: RequestInit = {}) {
 }
 ```
 
-Use `send()` for every request of the wrapper, including the call to `/refresh`. Shield sets the `XSRF-TOKEN` cookie on every response, so call a `GET` route when the app starts (for example `/me`) before the first `POST`.
+Replace the `send()` of the wrapper above with this one: `api()` doesn't change, and the call to `/refresh` also goes through `send()`. A rejected request makes `fetch()` throw, which the `.catch()` of the refresh turns into a failed refresh. Shield sets the `XSRF-TOKEN` cookie on every response, so call a `GET` route when the app starts (for example `/me`) before the first `POST`.
 
 `document.cookie` only reads the cookies of the page's own domain. When the app runs on `app.example.com` and the API on `api.example.com`, the `XSRF-TOKEN` cookie set by the API isn't readable by the app, unless it's set for the parent domain: set `cookie.domain` to `'.example.com'` in the `http` config of `config/app.ts`. Every cookie of the API is then sent to every subdomain, so only do it when you control all of them.
+
+To test `cookie.domain` locally, use a real domain or names declared in `/etc/hosts` (`app.example.test`, `api.example.test`): browsers treat `*.localhost` names as separate sites and don't share a parent-domain cookie between them.
 
 Two tabs can still refresh at the same time: the one that loses gets a `401` but keeps the cookies set by the other one, so its next request succeeds. Retry once more before showing the login page, or coordinate tabs with the [Web Locks API](https://developer.mozilla.org/docs/Web/API/Web_Locks_API).
 

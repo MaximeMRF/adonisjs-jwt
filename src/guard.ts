@@ -158,6 +158,15 @@ export class JwtGuard<
 
     const signPayload: Record<string, any> = this.#options.content!(providerUser)
     assertNoGuardClaims(signPayload, this.#options)
+    /**
+     * Without `userId`, the login succeeds but every request then gets a 401
+     * with no log: fail when issuing the token instead
+     */
+    if (!this.#options.getUserId && !isUserId(signPayload.userId)) {
+      throw new RuntimeException(
+        'JWT guard `content` must return `userId`, or set `getUserId` to read the user id from the payload'
+      )
+    }
     const token = this.#signAccessToken(signPayload)
 
     let refreshToken
@@ -417,29 +426,49 @@ export class JwtGuard<
    * during this request, or else the one sent by the client (cookie, body
    * or Authorization header).
    *
-   * The cookies are always cleared. When no valid refresh token is found,
-   * nothing is revoked and `E_UNAUTHORIZED_ACCESS` is raised, so a client
-   * that sends the wrong token (e.g. its access token) does not believe it
-   * has logged out while its refresh token stays valid.
+   * The cookies are cleared when the refresh token is revoked, and when
+   * there is no valid refresh token to revoke. In that case nothing is
+   * revoked and `E_UNAUTHORIZED_ACCESS` is raised, so a client that sends
+   * the wrong token (e.g. its access token) does not believe it has logged
+   * out while its refresh token stays valid. On any other error (e.g. the
+   * database is down), the cookies are kept so the client can retry.
    */
   async revoke(refreshToken?: string): Promise<void> {
     if (!this.#refreshTokenUserProvider) {
       throw new RuntimeException(REFRESH_TOKENS_NOT_CONFIGURED)
     }
 
+    try {
+      await this.#revokeRefreshToken(this.#refreshTokenUserProvider, refreshToken)
+    } catch (error) {
+      if (error instanceof errors.E_UNAUTHORIZED_ACCESS) this.#clearCookies()
+      throw error
+    }
     this.#clearCookies()
+  }
 
+  async #revokeRefreshToken(
+    provider: AccessTokensUserProviderContract<UserProvider[typeof symbols.PROVIDER_REAL_USER]>,
+    refreshToken?: string
+  ) {
     refreshToken = refreshToken ?? this.#issuedRefreshToken ?? (await this.#findRefreshToken())
 
     /**
      * Only delete a refresh token whose secret is valid. The tokens
      * provider deletes by id alone, so a forged token with a guessed
      * id would otherwise revoke another user's refresh token.
+     *
+     * Like the refresh, require the configured abilities: with two guards
+     * that share a tokens provider, the logout of one guard must not
+     * revoke the refresh tokens of the other.
      */
     const secret = new Secret(refreshToken)
+    const token = await provider.verifyToken(secret)
+    const requiredAbilities = this.#options.refreshTokenAbilities ?? []
     if (
-      !(await this.#refreshTokenUserProvider.verifyToken(secret)) ||
-      !(await this.#refreshTokenUserProvider.invalidateToken(secret))
+      !token ||
+      !requiredAbilities.every((ability) => token.allows(ability)) ||
+      !(await provider.invalidateToken(secret))
     ) {
       throw new errors.E_UNAUTHORIZED_ACCESS('Unauthorized access', {
         guardDriverName: this.driverName,

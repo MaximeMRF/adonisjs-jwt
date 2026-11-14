@@ -42,8 +42,8 @@ export class AsymmetricDriver implements JwtDriver {
       throw new Error(`Unsupported asymmetric algorithm "${algorithm}"`)
     }
 
-    const privateKey = createPrivateKey(this.#privateKey)
-    const publicKey = createPublicKey(this.#publicKey)
+    const privateKey = parseKey(createPrivateKey, this.#privateKey, 'privateKey')
+    const publicKey = parseKey(createPublicKey, this.#publicKey, 'publicKey')
 
     if (privateKey.asymmetricKeyType !== expectedKeyType) {
       throw new Error(
@@ -64,6 +64,13 @@ export class AsymmetricDriver implements JwtDriver {
     if (!createPublicKey(privateKey).equals(publicKey)) {
       throw new Error('publicKey does not belong to the same key pair as privateKey')
     }
+
+    /**
+     * The checks above do not cover everything jsonwebtoken requires (the
+     * curve of ES256/384/512, RSA keys of at least 2048 bits). Sign a token
+     * now, so a bad key fails at boot instead of every login.
+     */
+    jwt.sign({}, this.#privateKey, { algorithm, expiresIn: 60 })
   }
 
   sign(payload: Record<string, any>, options: { expiresIn: number | StringValue }): string {
@@ -84,5 +91,15 @@ export class AsymmetricDriver implements JwtDriver {
       ...(this.#clockTolerance !== undefined ? { clockTolerance: this.#clockTolerance } : {}),
     }
     return jwt.verify(token, this.#publicKey, verifyOptions)
+  }
+}
+
+function parseKey<T>(parse: (key: string) => T, key: string, name: string): T {
+  try {
+    return parse(key)
+  } catch (error) {
+    throw new Error(
+      `${name} is not a valid PEM key (${(error as Error).message}). If it comes from an env variable, replace the literal "\\n" with line breaks`
+    )
   }
 }

@@ -26,6 +26,20 @@ export const plugins: Config['plugins'] = [
 ]
 ```
 
+If the app also keeps the session guard (the Inertia and web starter kits), register the session plugin too, otherwise `loginAs` on the session guard fails with `request.withSession is not a function`:
+
+```ts
+import { sessionApiClient } from '@adonisjs/session/plugins/api_client'
+
+export const plugins: Config['plugins'] = [
+  assert(),
+  apiClient(),
+  pluginAdonisJS(app),
+  sessionApiClient(app),
+  authApiClient(app),
+]
+```
+
 ## Log in as a user
 
 ```ts
