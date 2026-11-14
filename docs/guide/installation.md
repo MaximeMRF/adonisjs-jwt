@@ -58,6 +58,13 @@ npm i @maximemrf/adonisjs-jwt@0.7.1
 The rest of this documentation describes the latest version.
 :::
 
+## Start from an example
+
+Two ready-to-run apps use the package, with tests:
+
+- [adonisjs-jwt-starter](https://github.com/MaximeMRF/adonisjs-jwt-starter): the AdonisJS API starter kit with JWT access tokens and refresh tokens instead of opaque tokens, with signup, login, refresh, logout and a protected route.
+- [adonisjs-jwt-k8s-example](https://github.com/MaximeMRF/adonisjs-jwt-k8s-example): an API that authenticates Kubernetes ServiceAccount tokens in JWKS mode, to deploy in your cluster with a single `kubectl apply -k`. See [Kubernetes ServiceAccount tokens](/guide/kubernetes).
+
 ## Next step
 
 [Configure the guard](/guide/configuration) in `config/auth.ts`.

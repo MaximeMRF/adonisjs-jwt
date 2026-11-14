@@ -77,6 +77,11 @@ router.get('me', async ({ auth }) => auth.getUserOrFail()).use(middleware.auth()
 
 Then see the [documentation](https://maximemrf.github.io/adonisjs-jwt/) for refresh tokens, cookies, asymmetric keys, JWKS and security.
 
+## Examples
+
+- [adonisjs-jwt-starter](https://github.com/MaximeMRF/adonisjs-jwt-starter): the AdonisJS API starter kit with JWT access tokens and refresh tokens.
+- [adonisjs-jwt-k8s-example](https://github.com/MaximeMRF/adonisjs-jwt-k8s-example): authenticate Kubernetes ServiceAccount tokens in JWKS mode.
+
 ## Contributing
 
 ```sh

@@ -6,6 +6,10 @@ description: "Authenticate services in Kubernetes with ServiceAccount tokens ver
 
 Services running in a Kubernetes cluster can authenticate against your API with their ServiceAccount token, without any shared secret. The API server signs these tokens and publishes its public keys, so the guard can verify them in [JWKS](/guide/jwks) mode.
 
+::: tip Example
+[adonisjs-jwt-k8s-example](https://github.com/MaximeMRF/adonisjs-jwt-k8s-example) is a complete app built from this guide, with the manifests to try it in your cluster.
+:::
+
 ![The kubelet mounts a projected token in the client pod, which sends it to the AdonisJS API. The guard verifies it with the API server's public keys. A default token is rejected with a 401.](/k8s-architecture.png)
 
 ## Configure the guard
