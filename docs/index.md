@@ -1,10 +1,11 @@
 ---
-description: "JWT authentication for AdonisJS: an auth guard with access tokens, rotating refresh tokens, HttpOnly cookies, RSA/ECDSA keys and JWKS verification."
+title: JWT authentication for AdonisJS v7
+description: "JWT authentication package for AdonisJS v7: an auth guard with access tokens, rotating refresh tokens, HttpOnly cookies, RSA/ECDSA keys and JWKS verification."
 layout: home
 
 hero:
   name: AdonisJS JWT
-  text: JWT authentication for AdonisJS
+  text: JWT authentication for AdonisJS v7
   tagline: An auth guard that issues and verifies JWT access tokens, with refresh tokens, cookies, asymmetric keys and JWKS.
   actions:
     - theme: brand
