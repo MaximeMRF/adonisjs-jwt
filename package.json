@@ -69,6 +69,7 @@
     "timekeeper": "^2.3.1",
     "typescript": "~6.0.3",
     "vitepress": "^1.6.4",
+    "vitepress-plugin-llms": "1.14.0",
     "youch": "^4.1.1"
   },
   "dependencies": {
